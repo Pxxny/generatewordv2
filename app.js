@@ -14,11 +14,36 @@
   };
 
   const CARDBOX_KEY = 'csw24_cardbox_v1';
+  const CUSTOM_KEY = 'csw24_custom_words_v1';
+  const DAY_MS = 86400000;
+  const PAGE_SIZE = 150;
+
+  let uidCounter = 0;
 
   // ---------- generic helpers ----------
 
   function sortLetters(word) {
     return word.split('').sort().join('');
+  }
+
+  function wordScore(word) {
+    let s = 0;
+    for (let i = 0; i < word.length; i++) s += SCRABBLE_VALUES[word[i]] || 0;
+    return s;
+  }
+
+  function letterCounts(str) {
+    const m = {};
+    for (let i = 0; i < str.length; i++) m[str[i]] = (m[str[i]] || 0) + 1;
+    return m;
+  }
+
+  function isSubsetOfCounts(word, rackCounts) {
+    const wc = letterCounts(word);
+    for (const ch in wc) {
+      if ((rackCounts[ch] || 0) < wc[ch]) return false;
+    }
+    return true;
   }
 
   function tileRowHTML(word, sizeClass) {
@@ -38,9 +63,59 @@
     return out + '</span>';
   }
 
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  // ---------- custom word pool ----------
+
+  let customWords = [];
+  let customByLength = {};
+
+  function loadCustomWords() {
+    try {
+      const raw = localStorage.getItem(CUSTOM_KEY);
+      customWords = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      customWords = [];
+    }
+    rebuildCustomIndex();
+  }
+
+  function saveCustomWords() {
+    localStorage.setItem(CUSTOM_KEY, JSON.stringify(customWords));
+  }
+
+  function rebuildCustomIndex() {
+    customByLength = {};
+    customWords.forEach(function (w) {
+      (customByLength[w.length] = customByLength[w.length] || []).push(w);
+    });
+  }
+
+  function includeCustomEnabled() {
+    const el = document.getElementById('includeCustomWords');
+    return !!(el && el.checked && customWords.length);
+  }
+
+  // central pool accessor — everything that needs a word list by length
+  // should go through here so custom imported words participate everywhere.
+  function lengthPool(L) {
+    const base = CSW24_BY_LENGTH[L] || [];
+    if (includeCustomEnabled() && customByLength[L] && customByLength[L].length) {
+      return base.concat(customByLength[L]);
+    }
+    return base;
+  }
+
   function getAnagrams(word) {
     const key = sortLetters(word);
-    const pool = CSW24_BY_LENGTH[word.length] || [];
+    const pool = lengthPool(word.length);
     const partners = [];
     for (let i = 0; i < pool.length; i++) {
       const w = pool[i];
@@ -53,15 +128,14 @@
     const lengths = [];
     let totalWeight = 0;
     for (let L = min; L <= max; L++) {
-      const arr = CSW24_BY_LENGTH[L];
+      const arr = lengthPool(L);
       if (arr && arr.length) {
         lengths.push({ L: L, w: arr.length });
         totalWeight += arr.length;
       }
     }
     if (!lengths.length) return [];
-    const maxPossible = totalWeight;
-    const target = Math.min(count, maxPossible);
+    const target = Math.min(count, totalWeight);
     const seen = new Set();
     const result = [];
     let guard = 0;
@@ -73,126 +147,38 @@
         if (r < lengths[i].w) { chosenLen = lengths[i].L; break; }
         r -= lengths[i].w;
       }
-      const arr = CSW24_BY_LENGTH[chosenLen];
+      const arr = lengthPool(chosenLen);
       const w = arr[Math.floor(Math.random() * arr.length)];
       if (!seen.has(w)) { seen.add(w); result.push(w); }
     }
     return result;
   }
 
-  function shuffle(arr) {
-    const a = arr.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
+  // ---------- shared word-row + anagram toggle rendering ----------
+
+  function wordRowHTML(word) {
+    uidCounter++;
+    const uid = uidCounter;
+    return (
+      '<div class="word-row" data-word="' + word + '">' +
+        '<div class="word-row-top">' +
+          '<div>' + tileRowHTML(word) + '</div>' +
+          '<div class="word-meta">' + word.length + ' ตัวอักษร · ' + wordScore(word) + ' คะแนน</div>' +
+          '<button class="anagram-toggle" data-uid="' + uid + '" data-word="' + word + '">🔤 ดู Anagram</button>' +
+        '</div>' +
+        '<div class="anagram-detail" id="anagram-' + uid + '"></div>' +
+      '</div>'
+    );
   }
 
-  // ---------- toast ----------
-
-  let toastTimer = null;
-  function showToast(msg) {
-    const el = document.getElementById('toast');
-    el.textContent = msg;
-    el.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2400);
-  }
-
-  // ---------- storage ----------
-
-  function loadCardbox() {
-    try {
-      const raw = localStorage.getItem(CARDBOX_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function saveCardbox(list) {
-    localStorage.setItem(CARDBOX_KEY, JSON.stringify(list));
-  }
-
-  function addWordsToCardbox(words) {
-    const box = loadCardbox();
-    const existing = new Set(box.map(function (c) { return c.word; }));
-    let added = 0;
-    words.forEach(function (w) {
-      if (!existing.has(w)) {
-        box.push({ word: w, addedAt: Date.now(), status: 'new', correct: 0, incorrect: 0, lastReviewed: null });
-        existing.add(w);
-        added++;
-      }
-    });
-    saveCardbox(box);
-    return added;
-  }
-
-  function removeFromCardbox(word) {
-    const box = loadCardbox().filter(function (c) { return c.word !== word; });
-    saveCardbox(box);
-  }
-
-  function updateCardResult(word, isCorrect) {
-    const box = loadCardbox();
-    const card = box.find(function (c) { return c.word === word; });
-    if (!card) return;
-    if (isCorrect) card.correct++; else card.incorrect++;
-    card.lastReviewed = Date.now();
-    if (card.correct >= 3) card.status = 'mastered';
-    else if (card.correct >= 1) card.status = 'learning';
-    else card.status = 'new';
-    saveCardbox(box);
-  }
-
-  function statusLabel(status) {
-    if (status === 'mastered') return 'เชี่ยวชาญ';
-    if (status === 'learning') return 'กำลังเรียน';
-    return 'คำใหม่';
-  }
-
-  // ---------- tab navigation ----------
-
-  function initTabs() {
-    const btns = document.querySelectorAll('.tab-btn');
-    btns.forEach(function (btn) {
+  function bindAnagramToggles(container) {
+    container.querySelectorAll('.anagram-toggle').forEach(function (btn) {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = '1';
       btn.addEventListener('click', function () {
-        btns.forEach(function (b) { b.classList.remove('active'); });
-        document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
-        btn.classList.add('active');
-        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-        if (btn.dataset.tab === 'cardbox') renderCardboxTab();
-        if (btn.dataset.tab === 'dashboard') renderDashboard();
-      });
-    });
-  }
-
-  // ---------- Generator tab ----------
-
-  const genState = { words: [] };
-
-  function renderGenResults() {
-    const wrap = document.getElementById('genResults');
-    wrap.innerHTML = genState.words.map(function (word, idx) {
-      return (
-        '<div class="word-row" data-word="' + word + '">' +
-          '<div class="word-row-top">' +
-            '<div>' + tileRowHTML(word) + '</div>' +
-            '<div class="word-meta">' + word.length + ' ตัวอักษร</div>' +
-            '<button class="anagram-toggle" data-idx="' + idx + '">🔤 ดู Anagram</button>' +
-          '</div>' +
-          '<div class="anagram-detail" id="anagram-' + idx + '"></div>' +
-        '</div>'
-      );
-    }).join('');
-
-    wrap.querySelectorAll('.anagram-toggle').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const idx = btn.dataset.idx;
-        const word = genState.words[idx];
-        const detail = document.getElementById('anagram-' + idx);
+        const uid = btn.dataset.uid;
+        const word = btn.dataset.word;
+        const detail = document.getElementById('anagram-' + uid);
         const isOpen = detail.classList.contains('open');
         if (isOpen) {
           detail.classList.remove('open');
@@ -209,7 +195,7 @@
               return '<span class="anagram-chip">' + p + '</span>';
             }).join('') + '</div>';
           } else {
-            html += '<div class="no-anagram">ไม่มีคำอื่นที่เป็น Anagram ของคำนี้ในพจนานุกรม CSW24</div>';
+            html += '<div class="no-anagram">ไม่มีคำอื่นที่เป็น Anagram ของคำนี้ในพจนานุกรม</div>';
           }
           detail.innerHTML = html;
           detail.dataset.built = '1';
@@ -218,6 +204,142 @@
         btn.textContent = '🔤 ซ่อน Anagram';
       });
     });
+  }
+
+  // ---------- toast ----------
+
+  let toastTimer = null;
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2600);
+  }
+
+  // ---------- cardbox storage + spaced repetition ----------
+
+  function loadCardbox() {
+    try {
+      const raw = localStorage.getItem(CARDBOX_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveCardbox(list) {
+    localStorage.setItem(CARDBOX_KEY, JSON.stringify(list));
+  }
+
+  function newCard(word) {
+    return {
+      word: word, addedAt: Date.now(), status: 'new',
+      correct: 0, incorrect: 0, lastReviewed: null,
+      interval: 0, ease: 2.5, reps: 0, due: Date.now()
+    };
+  }
+
+  function addWordsToCardbox(words) {
+    const box = loadCardbox();
+    const existing = new Set(box.map(function (c) { return c.word; }));
+    let added = 0;
+    words.forEach(function (w) {
+      if (!existing.has(w)) {
+        box.push(newCard(w));
+        existing.add(w);
+        added++;
+      }
+    });
+    saveCardbox(box);
+    return added;
+  }
+
+  function removeFromCardbox(word) {
+    const box = loadCardbox().filter(function (c) { return c.word !== word; });
+    saveCardbox(box);
+  }
+
+  function patchLegacyCard(card) {
+    if (card.ease == null) card.ease = 2.5;
+    if (card.reps == null) card.reps = 0;
+    if (card.interval == null) card.interval = 0;
+    if (card.due == null) card.due = Date.now();
+    return card;
+  }
+
+  // simplified SM-2 style spaced repetition
+  function updateCardResult(word, isCorrect) {
+    const box = loadCardbox();
+    const card = box.find(function (c) { return c.word === word; });
+    if (!card) return;
+    patchLegacyCard(card);
+
+    if (isCorrect) card.correct++; else card.incorrect++;
+    card.lastReviewed = Date.now();
+
+    if (isCorrect) {
+      if (card.reps === 0) card.interval = 1;
+      else if (card.reps === 1) card.interval = 3;
+      else card.interval = Math.max(1, Math.round(card.interval * card.ease));
+      card.reps++;
+      card.ease = Math.min(3.2, card.ease + 0.1);
+    } else {
+      card.reps = 0;
+      card.interval = 1;
+      card.ease = Math.max(1.3, card.ease - 0.2);
+    }
+    card.due = Date.now() + card.interval * DAY_MS;
+
+    if (card.correct >= 3) card.status = 'mastered';
+    else if (card.correct >= 1) card.status = 'learning';
+    else card.status = 'new';
+
+    saveCardbox(box);
+  }
+
+  function statusLabel(status) {
+    if (status === 'mastered') return 'เชี่ยวชาญ';
+    if (status === 'learning') return 'กำลังเรียน';
+    return 'คำใหม่';
+  }
+
+  // ---------- tab navigation ----------
+
+  let browseInitialized = false;
+
+  function initTabs() {
+    const btns = document.querySelectorAll('.tab-btn');
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        btns.forEach(function (b) { b.classList.remove('active'); });
+        document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        if (btn.dataset.tab === 'cardbox') renderCardboxTab();
+        if (btn.dataset.tab === 'dashboard') renderDashboard();
+        if (btn.dataset.tab === 'browse' && !browseInitialized) {
+          browseInitialized = true;
+          initBrowseChips();
+          runBrowseSearch();
+        }
+      });
+    });
+  }
+
+  // ---------- Generator tab ----------
+
+  const genState = { words: [] };
+
+  function renderGenResults() {
+    const wrap = document.getElementById('genResults');
+    wrap.innerHTML = genState.words.map(wordRowHTML).join('');
+    bindAnagramToggles(wrap);
+
+    let totalScore = 0;
+    genState.words.forEach(function (w) { totalScore += wordScore(w); });
+    document.getElementById('genSummaryLine').textContent =
+      'รวม ' + genState.words.length + ' คำ · คะแนนรวม ' + totalScore + ' แต้ม';
   }
 
   function initGenerator() {
@@ -307,6 +429,7 @@
           '<input type="checkbox" class="quiz-check" data-word="' + word + '">' +
           '<span class="qi-index">' + (idx + 1) + '</span>' +
           tileRowHTML(word, 'small') +
+          '<span class="word-meta">' + wordScore(word) + ' pts</span>' +
         '</label>'
       );
     }).join('');
@@ -365,17 +488,25 @@
 
   function renderCardboxTab() {
     const box = loadCardbox();
+    const now = Date.now();
+    const dueCount = box.filter(function (c) { return (c.due || 0) <= now; }).length;
+
     document.getElementById('cardboxCount').textContent = box.length;
+    document.getElementById('cardboxDueCount').textContent =
+      box.length ? dueCount + ' คำถึงกำหนดทบทวนตอนนี้' : '';
+
     const listEl = document.getElementById('cardboxList');
 
     if (!box.length) {
       listEl.innerHTML = '<div class="empty-state">ยังไม่มีคำศัพท์ใน Cardbox — ไปที่แท็บ "แบบทดสอบ" เพื่อเลือกคำที่อยากจำ</div>';
     } else {
       listEl.innerHTML = box.slice().sort(function (a, b) { return b.addedAt - a.addedAt; }).map(function (c) {
+        const isDue = (c.due || 0) <= now;
         return (
           '<div class="card-row">' +
             '<div>' + tileRowHTML(c.word, 'small') + '</div>' +
             '<div class="card-row-meta">' +
+              (isDue ? '<span class="status-pill status-learning">⏰ ถึงกำหนด</span>' : '') +
               '<span class="status-pill status-' + c.status + '">' + statusLabel(c.status) + '</span>' +
               '<span>✓' + c.correct + ' ✗' + c.incorrect + '</span>' +
               '<button class="remove-card-btn" data-word="' + c.word + '" title="ลบออกจาก Cardbox">✕</button>' +
@@ -407,11 +538,24 @@
     document.getElementById('startStudyBtn').addEventListener('click', function () {
       const box = loadCardbox();
       if (!box.length) { showToast('Cardbox ว่างอยู่ — เลือกคำศัพท์จากแท็บแบบทดสอบก่อน'); return; }
+
       const mode = document.getElementById('studyMode').value;
       const anagramOrder = document.getElementById('anagramOrder').value;
-      let n = parseInt(document.getElementById('studyCount').value, 10) || box.length;
-      n = Math.max(1, Math.min(n, box.length));
-      startStudySession(shuffle(box).slice(0, n), mode, anagramOrder);
+      const dueOnly = document.getElementById('dueOnlyToggle').checked;
+      const now = Date.now();
+
+      let pool = dueOnly ? box.filter(function (c) { return (c.due || 0) <= now; }) : box.slice();
+      if (dueOnly && !pool.length) {
+        showToast('ไม่มีคำที่ถึงกำหนดทบทวนตอนนี้ — ลองปิด "เฉพาะคำที่ถึงกำหนด" เพื่อทบทวนคำอื่น');
+        return;
+      }
+      pool.sort(function (a, b) { return (a.due || 0) - (b.due || 0); });
+
+      let n = parseInt(document.getElementById('studyCount').value, 10) || pool.length;
+      n = Math.max(1, Math.min(n, pool.length));
+
+      const queue = dueOnly ? pool.slice(0, n) : shuffle(pool).slice(0, n);
+      startStudySession(queue, mode, anagramOrder);
     });
 
     document.getElementById('resetBtn').addEventListener('click', function () {
@@ -427,6 +571,33 @@
 
   const session = { queue: [], index: 0, mode: 'flashcard', anagramOrder: 'alpha', correct: 0, incorrect: 0, flipped: false };
 
+  function sessionKeyHandler(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (confirm('ต้องการออกจากเซสชันทบทวนหรือไม่?')) endStudySession();
+      return;
+    }
+    if (e.key === 'Enter') {
+      const nextBtn = document.getElementById('anagramNextBtn') ||
+        document.getElementById('recallNextBtn') || document.getElementById('sessionFinishBtn');
+      if (nextBtn) { e.preventDefault(); nextBtn.click(); return; }
+    }
+    if (session.mode === 'flashcard') {
+      if (!session.flipped && (e.key === 'Enter' || e.code === 'Space')) {
+        const flipBtn = document.getElementById('flipBtn');
+        if (flipBtn) { e.preventDefault(); flipBtn.click(); }
+      } else if (session.flipped) {
+        if (e.key === 'Enter') {
+          const k = document.getElementById('knowBtn');
+          if (k) { e.preventDefault(); k.click(); }
+        } else if (e.key === 'Backspace') {
+          const d = document.getElementById('dontKnowBtn');
+          if (d) { e.preventDefault(); d.click(); }
+        }
+      }
+    }
+  }
+
   function startStudySession(cards, mode, anagramOrder) {
     session.queue = cards;
     session.index = 0;
@@ -437,10 +608,12 @@
     document.getElementById('cardboxSetup').style.display = 'none';
     document.getElementById('cardboxList').style.display = 'none';
     document.getElementById('studySession').classList.add('open');
+    document.addEventListener('keydown', sessionKeyHandler);
     renderSessionCard();
   }
 
   function endStudySession() {
+    document.removeEventListener('keydown', sessionKeyHandler);
     document.getElementById('studySession').classList.remove('open');
     document.getElementById('cardboxSetup').style.display = '';
     document.getElementById('cardboxList').style.display = '';
@@ -451,7 +624,8 @@
     const total = session.queue.length;
     document.getElementById('sessionProgressLabel').textContent =
       'คำที่ ' + Math.min(session.index + 1, total) + ' / ' + total +
-      '   ·   ถูก ' + session.correct + '   ผิด ' + session.incorrect;
+      '   ·   ถูก ' + session.correct + '   ผิด ' + session.incorrect +
+      '   ·   ⌨️ Enter = ตอบ/ถัดไป · Esc = ออก';
     const pct = total ? Math.round((session.index / total) * 100) : 0;
     document.getElementById('sessionBarFill').style.width = pct + '%';
   }
@@ -496,7 +670,7 @@
     if (!session.flipped) {
       area.innerHTML =
         '<div class="session-card">' +
-          '<div class="session-prompt-label">Flashcard · แตะเพื่อดูคำตอบ</div>' +
+          '<div class="session-prompt-label">Flashcard · แตะเพื่อดูคำตอบ (หรือกด Enter)</div>' +
           tileRowHTML(scrambled, 'big') +
           '<div class="session-controls"><button class="btn btn-primary" id="flipBtn">🔄 พลิกไพ่</button></div>' +
         '</div>';
@@ -508,9 +682,9 @@
       const partners = getAnagrams(word);
       area.innerHTML =
         '<div class="session-card">' +
-          '<div class="session-prompt-label">คำตอบ</div>' +
+          '<div class="session-prompt-label">คำตอบ · Enter = จำได้ · Backspace = ยังไม่รู้</div>' +
           tileRowHTML(word, 'big') +
-          (partners.length ? '<div class="word-meta">Anagram: ' + partners.join(', ') + '</div>' : '') +
+          '<div class="word-meta">' + wordScore(word) + ' คะแนน' + (partners.length ? ' · Anagram: ' + partners.join(', ') : '') + '</div>' +
           '<div class="session-controls">' +
             '<button class="btn btn-outline" id="dontKnowBtn">✗ ยังไม่รู้</button>' +
             '<button class="btn btn-teal" id="knowBtn">✓ จำได้</button>' +
@@ -528,12 +702,12 @@
         '<div class="session-prompt-label">Anagram · เรียงตัวอักษรให้เป็นคำศัพท์</div>' +
         tileRowHTML(letters, 'big') +
         '<form class="session-answer-form" id="anagramForm">' +
-          '<input type="text" id="anagramInput" autocomplete="off" placeholder="พิมพ์คำตอบ" autofocus>' +
+          '<input type="text" id="anagramInput" autocomplete="off" placeholder="พิมพ์คำตอบแล้วกด Enter" autofocus>' +
           '<button class="btn btn-primary" type="submit">ตรวจคำตอบ</button>' +
         '</form>' +
         '<div class="session-feedback" id="anagramFeedback"></div>' +
         '<div class="session-controls" id="anagramNextWrap" style="display:none">' +
-          '<button class="btn btn-teal" id="anagramNextBtn">ต่อไป →</button>' +
+          '<button class="btn btn-teal" id="anagramNextBtn">ต่อไป (Enter) →</button>' +
         '</div>' +
       '</div>';
 
@@ -543,14 +717,21 @@
       e.preventDefault();
       const input = document.getElementById('anagramInput');
       const guess = input.value.trim().toUpperCase();
-      const isCorrect = guess === word;
+      if (!guess) return;
+
+      // A scrambled rack of letters can legitimately spell more than one
+      // dictionary word (e.g. EGL -> LEG or GEL) — any of them counts.
+      const validGroup = [word].concat(getAnagrams(word));
+      const isCorrect = validGroup.indexOf(guess) !== -1;
+
       input.disabled = true;
       form.querySelector('button').disabled = true;
       if (isCorrect) {
-        feedback.textContent = '✓ ถูกต้อง! ' + word;
+        feedback.textContent = '✓ ถูกต้อง! ' + guess +
+          (validGroup.length > 1 ? '  (คำอื่นที่เป็นไปได้เช่นกัน: ' + validGroup.filter(function (w) { return w !== guess; }).join(', ') + ')' : '');
         feedback.className = 'session-feedback correct';
       } else {
-        feedback.textContent = '✗ ยังไม่ถูก — คำตอบคือ ' + word;
+        feedback.textContent = '✗ ยังไม่ถูก — คำตอบที่เป็นไปได้: ' + validGroup.join(', ');
         feedback.className = 'session-feedback wrong';
       }
       recordAnswer(word, isCorrect);
@@ -565,12 +746,12 @@
         '<div class="session-prompt-label">Active Recall · นึกคำศัพท์จากความจำ (' + word.length + ' ตัวอักษร)</div>' +
         blankTileRowHTML(word.length, 'big') +
         '<form class="session-answer-form" id="recallForm">' +
-          '<input type="text" id="recallInput" autocomplete="off" placeholder="พิมพ์คำตอบ" autofocus>' +
+          '<input type="text" id="recallInput" autocomplete="off" placeholder="พิมพ์คำตอบแล้วกด Enter" autofocus>' +
           '<button class="btn btn-primary" type="submit">ตรวจคำตอบ</button>' +
         '</form>' +
         '<div class="session-feedback" id="recallFeedback"></div>' +
         '<div class="session-controls" id="recallNextWrap" style="display:none">' +
-          '<button class="btn btn-teal" id="recallNextBtn">ต่อไป →</button>' +
+          '<button class="btn btn-teal" id="recallNextBtn">ต่อไป (Enter) →</button>' +
         '</div>' +
       '</div>';
 
@@ -580,6 +761,7 @@
       e.preventDefault();
       const input = document.getElementById('recallInput');
       const guess = input.value.trim().toUpperCase();
+      if (!guess) return;
       const isCorrect = guess === word;
       input.disabled = true;
       form.querySelector('button').disabled = true;
@@ -600,19 +782,21 @@
 
   function renderDashboard() {
     const box = loadCardbox();
+    const now = Date.now();
     const total = box.length;
     const counts = { new: 0, learning: 0, mastered: 0 };
-    let totalCorrect = 0, totalIncorrect = 0;
+    let totalCorrect = 0, totalIncorrect = 0, dueCount = 0;
     box.forEach(function (c) {
       counts[c.status] = (counts[c.status] || 0) + 1;
       totalCorrect += c.correct;
       totalIncorrect += c.incorrect;
+      if ((c.due || 0) <= now) dueCount++;
     });
 
     document.getElementById('dashStatGrid').innerHTML =
       statCard(total, 'คำใน Cardbox', '') +
-      statCard(counts.new, 'คำใหม่', '') +
-      statCard(counts.learning, 'กำลังเรียน', 'brass') +
+      statCard(dueCount, 'ถึงกำหนดทบทวน', 'brass') +
+      statCard(counts.learning, 'กำลังเรียน', '') +
       statCard(counts.mastered, 'เชี่ยวชาญ', 'teal') +
       statCard(totalCorrect + totalIncorrect, 'จำนวนครั้งที่ทบทวน', '');
 
@@ -624,6 +808,9 @@
       legendItem('var(--teal)', 'เชี่ยวชาญ', counts.mastered) +
       legendItem('var(--brass)', 'กำลังเรียน', counts.learning) +
       legendItem('#3a4a42', 'คำใหม่', counts.new);
+
+    document.getElementById('customWordsCount').textContent =
+      customWords.length ? 'คำศัพท์ที่นำเข้าเอง: ' + customWords.length + ' คำ' : 'ยังไม่มีคำศัพท์ที่นำเข้าเอง';
   }
 
   function statCard(num, label, cls) {
@@ -634,13 +821,430 @@
     return '<div class="legend-item"><span class="legend-dot" style="background:' + color + '"></span>' + label + ' (' + count + ')</div>';
   }
 
+  // ---------- Import / Export ----------
+
+  function initImportExport() {
+    document.getElementById('exportProgressBtn').addEventListener('click', function () {
+      const box = loadCardbox();
+      const blob = new Blob([JSON.stringify(box, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const today = new Date().toISOString().slice(0, 10);
+      downloadDataUrl(url, 'csw24-progress-backup-' + today + '.json');
+      showToast('ส่งออกความคืบหน้าแล้ว (' + box.length + ' คำ)');
+    });
+
+    document.getElementById('importProgressInput').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function () {
+        try {
+          const imported = JSON.parse(reader.result);
+          if (!Array.isArray(imported)) throw new Error('bad format');
+          const box = loadCardbox();
+          const byWord = {};
+          box.forEach(function (c) { byWord[c.word] = c; });
+          let added = 0, updated = 0;
+          imported.forEach(function (item) {
+            if (!item || !item.word) return;
+            const word = String(item.word).toUpperCase();
+            const card = Object.assign(newCard(word), item, { word: word });
+            patchLegacyCard(card);
+            if (byWord[word]) updated++; else added++;
+            byWord[word] = card;
+          });
+          saveCardbox(Object.values(byWord));
+          renderCardboxTab();
+          renderDashboard();
+          showToast('นำเข้าความคืบหน้าแล้ว (เพิ่มใหม่ ' + added + ' · อัปเดต ' + updated + ')');
+        } catch (err) {
+          showToast('ไฟล์ไม่ถูกต้อง ไม่สามารถนำเข้าได้');
+        }
+        e.target.value = '';
+      };
+      reader.readAsText(file);
+    });
+
+    document.getElementById('importWordsInput').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function () {
+        const lines = reader.result.split(/\r?\n/);
+        const existing = new Set(customWords);
+        let added = 0, skipped = 0;
+        lines.forEach(function (line) {
+          const w = line.trim().toUpperCase();
+          if (!w) return;
+          if (!/^[A-Z]{2,15}$/.test(w)) { skipped++; return; }
+          if (existing.has(w)) { skipped++; return; }
+          existing.add(w);
+          customWords.push(w);
+          added++;
+        });
+        rebuildCustomIndex();
+        saveCustomWords();
+        renderDashboard();
+        showToast('นำเข้าคำศัพท์ใหม่ ' + added + ' คำ (ข้าม ' + skipped + ' คำที่ซ้ำ/ไม่ถูกรูปแบบ)');
+        e.target.value = '';
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  // ---------- Word browser tab ----------
+
+  const browseState = { activeLength: 'all', results: [], shown: 0 };
+
+  function initBrowseChips() {
+    const wrap = document.getElementById('browseLengthChips');
+    let html = '<button class="length-chip active" data-len="all">ทั้งหมด</button>';
+    for (let L = CSW24_MIN_LEN; L <= CSW24_MAX_LEN; L++) {
+      html += '<button class="length-chip" data-len="' + L + '">' + L + '</button>';
+    }
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.length-chip').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        wrap.querySelectorAll('.length-chip').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        browseState.activeLength = btn.dataset.len === 'all' ? 'all' : parseInt(btn.dataset.len, 10);
+        runBrowseSearch();
+      });
+    });
+
+    ['filterStarts', 'filterEnds', 'filterContains', 'filterContainsAll', 'filterScoreMin', 'filterScoreMax'].forEach(function (id) {
+      document.getElementById(id).addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') runBrowseSearch();
+      });
+    });
+    document.getElementById('browseSearchBtn').addEventListener('click', runBrowseSearch);
+    document.getElementById('browseClearBtn').addEventListener('click', function () {
+      ['filterStarts', 'filterEnds', 'filterContains', 'filterContainsAll', 'filterScoreMin', 'filterScoreMax'].forEach(function (id) {
+        document.getElementById(id).value = '';
+      });
+      runBrowseSearch();
+    });
+    document.getElementById('browseLoadMoreBtn').addEventListener('click', function () { renderBrowseResults(false); });
+  }
+
+  function wordMatchesFilters(word, f) {
+    if (f.starts && !word.startsWith(f.starts)) return false;
+    if (f.ends && !word.endsWith(f.ends)) return false;
+    if (f.contains && word.indexOf(f.contains) === -1) return false;
+    if (f.containsAll) {
+      for (let i = 0; i < f.containsAll.length; i++) {
+        if (word.indexOf(f.containsAll[i]) === -1) return false;
+      }
+    }
+    if (f.scoreMin != null && wordScore(word) < f.scoreMin) return false;
+    if (f.scoreMax != null && wordScore(word) > f.scoreMax) return false;
+    return true;
+  }
+
+  function runBrowseSearch() {
+    const starts = document.getElementById('filterStarts').value.trim().toUpperCase();
+    const ends = document.getElementById('filterEnds').value.trim().toUpperCase();
+    const contains = document.getElementById('filterContains').value.trim().toUpperCase();
+    const containsAllRaw = document.getElementById('filterContainsAll').value.trim().toUpperCase();
+    const scoreMinRaw = document.getElementById('filterScoreMin').value;
+    const scoreMaxRaw = document.getElementById('filterScoreMax').value;
+
+    const f = {
+      starts: starts, ends: ends, contains: contains,
+      containsAll: containsAllRaw ? Array.from(new Set(containsAllRaw.split(''))) : null,
+      scoreMin: scoreMinRaw ? parseInt(scoreMinRaw, 10) : null,
+      scoreMax: scoreMaxRaw ? parseInt(scoreMaxRaw, 10) : null
+    };
+    const hasFilters = !!(starts || ends || contains || f.containsAll || f.scoreMin != null || f.scoreMax != null);
+
+    let candidates = [];
+    if (browseState.activeLength === 'all') {
+      for (let L = CSW24_MIN_LEN; L <= CSW24_MAX_LEN; L++) candidates = candidates.concat(lengthPool(L));
+    } else {
+      candidates = lengthPool(browseState.activeLength);
+    }
+
+    const results = hasFilters ? candidates.filter(function (w) { return wordMatchesFilters(w, f); }) : candidates;
+    browseState.results = results;
+    browseState.shown = 0;
+
+    document.getElementById('browseResultCount').textContent = 'พบ ' + results.length.toLocaleString('en-US') + ' คำ';
+    renderBrowseResults(true);
+  }
+
+  function renderBrowseResults(reset) {
+    const wrap = document.getElementById('browseResults');
+    if (reset) wrap.innerHTML = '';
+    const slice = browseState.results.slice(browseState.shown, browseState.shown + PAGE_SIZE);
+    wrap.insertAdjacentHTML('beforeend', slice.map(wordRowHTML).join(''));
+    bindAnagramToggles(wrap);
+    browseState.shown += slice.length;
+    document.getElementById('browseLoadMoreWrap').style.display =
+      browseState.shown < browseState.results.length ? '' : 'none';
+  }
+
+  // ---------- Minigame: typing ----------
+
+  const tg = { words: [], index: 0, strict: false, mistakes: 0, startTime: 0, timerHandle: null };
+
+  function initTypingGame() {
+    document.getElementById('tgStartBtn').addEventListener('click', function () {
+      let min = parseInt(document.getElementById('tgMin').value, 10) || CSW24_MIN_LEN;
+      let max = parseInt(document.getElementById('tgMax').value, 10) || CSW24_MAX_LEN;
+      let count = parseInt(document.getElementById('tgCount').value, 10) || 10;
+      min = Math.max(CSW24_MIN_LEN, Math.min(min, CSW24_MAX_LEN));
+      max = Math.max(CSW24_MIN_LEN, Math.min(max, CSW24_MAX_LEN));
+      if (min > max) { const t = min; min = max; max = t; }
+      count = Math.max(1, Math.min(count, 100));
+
+      const words = pickRandomWords(min, max, count);
+      if (!words.length) { showToast('ไม่พบคำศัพท์ในช่วงความยาวที่เลือก'); return; }
+
+      tg.words = words;
+      tg.strict = document.getElementById('tgStrict').checked;
+      tgRestart();
+      document.getElementById('typingPlay').style.display = '';
+    });
+  }
+
+  function tgRestart() {
+    tg.index = 0;
+    tg.mistakes = 0;
+    tg.startTime = Date.now();
+    if (tg.timerHandle) clearInterval(tg.timerHandle);
+    tg.timerHandle = setInterval(tgUpdateTimer, 500);
+    tgRenderPlay();
+  }
+
+  function tgFormatTime(ms) {
+    const s = Math.floor(ms / 1000);
+    const mm = String(Math.floor(s / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    return mm + ':' + ss;
+  }
+
+  function tgUpdateTimer() {
+    const el = document.getElementById('tgTimer');
+    if (el) el.textContent = tgFormatTime(Date.now() - tg.startTime);
+  }
+
+  function tgRenderPlay() {
+    const word = tg.words[tg.index];
+    const area = document.getElementById('typingPlay');
+    const pct = Math.round((tg.index / tg.words.length) * 100);
+    area.innerHTML =
+      '<div class="session-progress">คำที่ ' + (tg.index + 1) + ' / ' + tg.words.length +
+        ' · พลาด ' + tg.mistakes + ' ครั้ง · เวลา <span id="tgTimer">' + tgFormatTime(Date.now() - tg.startTime) + '</span></div>' +
+      '<div class="session-bar"><div class="session-bar-fill" style="width:' + pct + '%"></div></div>' +
+      '<div class="session-card">' +
+        '<div class="session-prompt-label">พิมพ์คำนี้ให้ตรงทุกตัวอักษร' + (tg.strict ? ' · โหมดเข้มงวด: พิมพ์ผิด = เริ่มใหม่' : '') + '</div>' +
+        '<div class="tile-word" id="tgTargetTiles">' + word.split('').map(function (ch) {
+          return '<span class="letter-tile big type-letter">' + ch + '</span>';
+        }).join('') + '</div>' +
+        '<input type="text" id="tgInput" class="session-answer-form-input" autocomplete="off" autofocus>' +
+      '</div>';
+
+    const input = document.getElementById('tgInput');
+    input.addEventListener('input', function () { tgHandleInput(word, input); });
+    input.focus();
+  }
+
+  function tgHandleInput(word, input) {
+    let val = input.value.toUpperCase();
+    if (val.length > word.length) { val = val.slice(0, word.length); input.value = val; }
+
+    const tiles = document.querySelectorAll('#tgTargetTiles .letter-tile');
+    let mismatch = false;
+    for (let i = 0; i < tiles.length; i++) {
+      tiles[i].classList.remove('correct-letter', 'wrong-letter');
+      if (i < val.length) {
+        if (val[i] === word[i]) tiles[i].classList.add('correct-letter');
+        else { tiles[i].classList.add('wrong-letter'); mismatch = true; }
+      }
+    }
+
+    if (mismatch) {
+      tg.mistakes++;
+      if (tg.strict) {
+        showToast('พิมพ์ผิด! เริ่มใหม่ตั้งแต่คำแรก');
+        tgRestart();
+        return;
+      }
+      return;
+    }
+
+    if (val === word) {
+      input.disabled = true;
+      setTimeout(function () {
+        tg.index++;
+        if (tg.index >= tg.words.length) tgFinish();
+        else tgRenderPlay();
+      }, 200);
+    }
+  }
+
+  function tgFinish() {
+    if (tg.timerHandle) { clearInterval(tg.timerHandle); tg.timerHandle = null; }
+    const elapsed = Date.now() - tg.startTime;
+    const area = document.getElementById('typingPlay');
+    area.innerHTML =
+      '<div class="session-summary">' +
+        '<div class="session-prompt-label">จบเกม!</div>' +
+        '<div class="big-stat">' + tgFormatTime(elapsed) + '</div>' +
+        '<p>พิมพ์ครบ ' + tg.words.length + ' คำ · พลาดทั้งหมด ' + tg.mistakes + ' ครั้ง</p>' +
+        '<div class="session-controls"><button class="btn btn-primary" id="tgPlayAgainBtn">🔁 เล่นอีกครั้ง</button></div>' +
+      '</div>';
+    document.getElementById('tgPlayAgainBtn').addEventListener('click', tgRestart);
+  }
+
+  // ---------- Minigame: random racks ----------
+
+  const rg = { rack: [], solutions: new Set(), found: new Set(), score: 0, revealed: false };
+  const RG_LETTER_BAG = 'AAAAAAAAABBCCDDDDEEEEEEEEEEEEFFGGGHHIIIIIIIIIJKLLLLMMNNNNNNOOOOOOOOPPQRRRRRRSSSSTTTTTTUUUUVVWWXYYZ';
+
+  function initRacksGame() {
+    document.getElementById('rgStartBtn').addEventListener('click', rgStart);
+  }
+
+  function rgStart() {
+    let size = parseInt(document.getElementById('rgSize').value, 10) || 7;
+    size = Math.max(4, Math.min(size, 10));
+
+    const letters = [];
+    for (let i = 0; i < size; i++) letters.push(RG_LETTER_BAG[Math.floor(Math.random() * RG_LETTER_BAG.length)]);
+    rg.rack = letters;
+
+    const rackCounts = letterCounts(letters.join(''));
+    const solutions = new Set();
+    for (let L = 2; L <= size; L++) {
+      const pool = lengthPool(L);
+      for (let i = 0; i < pool.length; i++) {
+        if (isSubsetOfCounts(pool[i], rackCounts)) solutions.add(pool[i]);
+      }
+    }
+    rg.solutions = solutions;
+    rg.found = new Set();
+    rg.score = 0;
+    rg.revealed = false;
+
+    document.getElementById('racksPlay').style.display = '';
+    rgRenderPlay();
+  }
+
+  function rgRenderPlay() {
+    const area = document.getElementById('racksPlay');
+    const foundChips = Array.from(rg.found).sort().map(function (w) {
+      return '<span class="anagram-chip">' + w + ' (' + wordScore(w) + ')</span>';
+    }).join('');
+
+    area.innerHTML =
+      '<div class="session-progress">พบแล้ว ' + rg.found.size + ' / ' + rg.solutions.size + ' คำ · คะแนนรวม ' + rg.score + '</div>' +
+      '<div class="session-card">' +
+        '<div class="session-prompt-label">หาคำศัพท์ทั้งหมดที่ประกอบจากตัวอักษรใน Rack นี้</div>' +
+        tileRowHTML(rg.rack.join(''), 'big') +
+        (rg.revealed ? '' :
+          '<form class="session-answer-form" id="rgForm">' +
+            '<input type="text" id="rgInput" autocomplete="off" placeholder="พิมพ์คำแล้วกด Enter" autofocus>' +
+            '<button class="btn btn-primary" type="submit">ส่งคำตอบ</button>' +
+          '</form>') +
+        '<div class="session-controls">' +
+          (rg.revealed ? '' : '<button class="btn btn-outline" id="rgRevealBtn">👁 ดูคำตอบทั้งหมด</button>') +
+          '<button class="btn btn-teal" id="rgNewRoundBtn">🔁 รอบใหม่</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="anagram-partners" id="rgFoundList" style="margin-top:1rem">' + foundChips + '</div>' +
+      (rg.revealed ? '<div id="rgAllSolutions" style="margin-top:1rem"></div>' : '');
+
+    document.getElementById('rgNewRoundBtn').addEventListener('click', rgStart);
+
+    if (!rg.revealed) {
+      document.getElementById('rgRevealBtn').addEventListener('click', function () {
+        rg.revealed = true;
+        rgRenderPlay();
+      });
+      const form = document.getElementById('rgForm');
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const input = document.getElementById('rgInput');
+        const guess = input.value.trim().toUpperCase();
+        input.value = '';
+        input.focus();
+        if (!guess) return;
+        if (rg.found.has(guess)) { showToast('เจอคำนี้ไปแล้ว'); return; }
+        if (rg.solutions.has(guess)) {
+          rg.found.add(guess);
+          rg.score += wordScore(guess);
+          showToast('✓ ถูกต้อง! +' + wordScore(guess) + ' คะแนน');
+          rgRenderPlay();
+          const freshInput = document.getElementById('rgInput');
+          if (freshInput) freshInput.focus();
+        } else {
+          showToast('✗ ไม่ใช่คำที่ประกอบจาก Rack นี้');
+        }
+      });
+    } else {
+      const byLen = {};
+      rg.solutions.forEach(function (w) { (byLen[w.length] = byLen[w.length] || []).push(w); });
+      const lens = Object.keys(byLen).map(Number).sort(function (a, b) { return b - a; });
+      let html = '';
+      lens.forEach(function (L) {
+        html += '<div class="key-row"><span class="key-label">' + L + ' ตัวอักษร</span></div><div class="anagram-partners">';
+        html += byLen[L].sort().map(function (w) {
+          return '<span class="anagram-chip' + (rg.found.has(w) ? '' : ' missed') + '">' + w + '</span>';
+        }).join('');
+        html += '</div>';
+      });
+      document.getElementById('rgAllSolutions').innerHTML = html;
+    }
+  }
+
+  // ---------- Minigame sub-tab toggle ----------
+
+  function initMinigameTabs() {
+    const typingBtn = document.getElementById('gameTabTyping');
+    const racksBtn = document.getElementById('gameTabRacks');
+    const typingPanel = document.getElementById('typingGamePanel');
+    const racksPanel = document.getElementById('racksGamePanel');
+    typingBtn.addEventListener('click', function () {
+      typingBtn.classList.add('btn-primary'); typingBtn.classList.remove('btn-outline');
+      racksBtn.classList.add('btn-outline'); racksBtn.classList.remove('btn-primary');
+      typingPanel.style.display = ''; racksPanel.style.display = 'none';
+    });
+    racksBtn.addEventListener('click', function () {
+      racksBtn.classList.add('btn-primary'); racksBtn.classList.remove('btn-outline');
+      typingBtn.classList.add('btn-outline'); typingBtn.classList.remove('btn-primary');
+      racksPanel.style.display = ''; typingPanel.style.display = 'none';
+    });
+  }
+
+  // ---------- global keyboard shortcuts ----------
+
+  function initGlobalShortcuts() {
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== '/') return;
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const browseTab = document.getElementById('tab-browse');
+      if (browseTab && browseTab.classList.contains('active')) {
+        e.preventDefault();
+        document.getElementById('filterContains').focus();
+      }
+    });
+  }
+
   // ---------- init ----------
 
   document.addEventListener('DOMContentLoaded', function () {
+    loadCustomWords();
     initTabs();
     initGenerator();
     initQuizTab();
     initCardboxTab();
+    initImportExport();
+    initTypingGame();
+    initRacksGame();
+    initMinigameTabs();
+    initGlobalShortcuts();
     renderCardboxTab();
     renderDashboard();
   });
