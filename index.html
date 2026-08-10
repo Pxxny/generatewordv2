@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Peony CSW24 — เจนคำศัพท์ & ทบทวนแบบ Flashcard/Anagram</title>
+<title>CSW24 Word Lab — เจนคำศัพท์ & ทบทวนแบบ Flashcard/Anagram</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
@@ -18,14 +18,16 @@
     <span class="logo-tile">2</span>
     <span class="logo-tile">4</span>
   </div>
-  <h1>Peony CSW24</h1>
-  <p>เจนคำศัพท์ · หา Anagram · เก็บลง Cardbox · ทบทวนด้วย Flashcard &amp; Active Recall</p>
+  <h1>CSW24 Word Lab</h1>
+  <p>เจนคำศัพท์ · หา Anagram · เก็บลง Cardbox · ทบทวนแบบ Spaced Repetition · Minigame</p>
 </header>
 
 <nav class="tab-nav">
   <button class="tab-btn active" data-tab="generate">📝 สร้างคำศัพท์</button>
   <button class="tab-btn" data-tab="quiz">🎯 แบบทดสอบ</button>
   <button class="tab-btn" data-tab="cardbox">🗂️ Cardbox</button>
+  <button class="tab-btn" data-tab="browse">📖 คลังคำศัพท์</button>
+  <button class="tab-btn" data-tab="minigame">🕹️ Minigame</button>
   <button class="tab-btn" data-tab="dashboard">📊 Dashboard</button>
 </nav>
 
@@ -35,7 +37,7 @@
   <section id="tab-generate" class="tab-panel active">
     <div class="panel-card">
       <h2>สร้างรายการคำศัพท์</h2>
-      <p class="panel-sub">สุ่มคำจากพจนานุกรม CSW24 กำหนดความยาวตัวอักษร (ช่วง) และจำนวนคำที่ต้องการ พร้อมดู Anagram ของแต่ละคำได้</p>
+      <p class="panel-sub">สุ่มคำจากพจนานุกรม CSW24 กำหนดความยาวตัวอักษร (ช่วง) และจำนวนคำที่ต้องการ พร้อมดู Anagram และคะแนนของแต่ละคำ</p>
       <div class="control-row">
         <div class="field">
           <label for="genMin">ความยาวต่ำสุด</label>
@@ -57,6 +59,7 @@
     <div class="panel-card" id="genResultsPanel" style="display:none">
       <div id="exportCapture">
         <h2 id="exportTitle">รายการคำศัพท์</h2>
+        <p class="field-hint" id="genSummaryLine"></p>
         <div id="genResults"></div>
       </div>
       <div class="btn-row">
@@ -105,7 +108,7 @@
   <section id="tab-cardbox" class="tab-panel">
     <div class="panel-card">
       <h2>การ์ดของฉัน (Cardbox)</h2>
-      <p class="panel-sub">คำศัพท์ที่บันทึกไว้ — เลือกรูปแบบทบทวนแล้วเริ่มเรียนได้เลย ความคืบหน้าจะถูกเก็บไว้ในเครื่องอัตโนมัติ</p>
+      <p class="panel-sub">คำศัพท์ที่บันทึกไว้ — เลือกรูปแบบทบทวนแล้วเริ่มเรียนได้เลย ระบบใช้ Spaced Repetition (SM-2 แบบย่อ) เพื่อจัดคิวคำที่ควรทบทวน ความคืบหน้าเก็บไว้ในเครื่องอัตโนมัติ</p>
 
       <div id="cardboxSetup">
         <div class="control-row">
@@ -128,11 +131,12 @@
             <label for="studyCount">จำนวนคำที่ทบทวน</label>
             <input type="number" id="studyCount" min="1" value="10">
           </div>
+          <label class="checkbox-field"><input type="checkbox" id="dueOnlyToggle" checked> เฉพาะคำที่ถึงกำหนด</label>
           <button class="btn btn-primary" id="startStudyBtn">▶ เริ่มทบทวน</button>
         </div>
       </div>
 
-      <p style="margin-top:0.6rem"><strong id="cardboxCount">0</strong> คำใน Cardbox</p>
+      <p style="margin-top:0.6rem"><strong id="cardboxCount">0</strong> คำใน Cardbox · <span id="cardboxDueCount" class="field-hint"></span></p>
       <div id="cardboxList"></div>
     </div>
 
@@ -140,6 +144,81 @@
       <div class="session-progress" id="sessionProgressLabel"></div>
       <div class="session-bar"><div class="session-bar-fill" id="sessionBarFill" style="width:0%"></div></div>
       <div id="sessionArea"></div>
+    </div>
+  </section>
+
+  <!-- ============== WORD BROWSER TAB ============== -->
+  <section id="tab-browse" class="tab-panel">
+    <div class="panel-card">
+      <h2>คลังคำศัพท์ทั้งหมด</h2>
+      <p class="panel-sub">เรียกดูคำศัพท์ทุกคำในพจนานุกรม CSW24 (2–15 ตัวอักษร) เรียงจาก A พร้อมตัวกรองแบบละเอียด · กด <strong>/</strong> เพื่อโฟกัสช่องค้นหา</p>
+
+      <div class="field" style="margin-bottom:0.9rem">
+        <label>ความยาว</label>
+        <div class="chip-row" id="browseLengthChips"></div>
+      </div>
+
+      <div class="control-row">
+        <div class="field"><label for="filterStarts">ขึ้นต้นด้วย</label><input type="text" id="filterStarts" maxlength="15" placeholder="เช่น CAR"></div>
+        <div class="field"><label for="filterEnds">ลงท้ายด้วย</label><input type="text" id="filterEnds" maxlength="15" placeholder="เช่น ING"></div>
+        <div class="field"><label for="filterContains">มีคำว่า (Contains)</label><input type="text" id="filterContains" maxlength="15" placeholder="เช่น AT"></div>
+      </div>
+      <div class="control-row">
+        <div class="field"><label for="filterContainsAll">มีตัวอักษรครบ (Contains All)</label><input type="text" id="filterContainsAll" maxlength="15" placeholder="เช่น AEI"></div>
+        <div class="field"><label for="filterScoreMin">คะแนนต่ำสุด</label><input type="number" id="filterScoreMin" min="0" placeholder="0"></div>
+        <div class="field"><label for="filterScoreMax">คะแนนสูงสุด</label><input type="number" id="filterScoreMax" min="0" placeholder="100"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="browseSearchBtn">🔍 ค้นหา (Enter)</button>
+        <button class="btn btn-outline btn-sm" id="browseClearBtn">ล้างตัวกรอง</button>
+      </div>
+      <p class="field-hint" id="browseResultCount"></p>
+    </div>
+
+    <div class="panel-card">
+      <div id="browseResults"></div>
+      <div class="btn-row" id="browseLoadMoreWrap" style="display:none">
+        <button class="btn btn-outline" id="browseLoadMoreBtn">โหลดเพิ่ม</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== MINIGAME TAB ============== -->
+  <section id="tab-minigame" class="tab-panel">
+    <div class="panel-card">
+      <h2>🕹️ Minigame</h2>
+      <p class="panel-sub">ฝึกพิมพ์คำศัพท์ให้เร็วและแม่นยำ หรือท้าทายตัวเองหาคำทั้งหมดจาก Rack ตัวอักษร</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="gameTabTyping">⌨️ พิมพ์ศัพท์ Random</button>
+        <button class="btn btn-outline" id="gameTabRacks">🁢 Random Racks</button>
+      </div>
+    </div>
+
+    <div class="panel-card" id="typingGamePanel">
+      <h2>⌨️ พิมพ์ศัพท์ Random</h2>
+      <p class="panel-sub">พิมพ์คำที่ปรากฏให้ตรงทุกตัวอักษร เปิดโหมดเข้มงวดถ้าอยากให้พิมพ์ผิดแล้วเริ่มรอบใหม่ทันที</p>
+      <div id="typingSetup">
+        <div class="control-row">
+          <div class="field"><label for="tgMin">ความยาวต่ำสุด</label><input type="number" id="tgMin" min="2" max="15" value="2"></div>
+          <div class="field"><label for="tgMax">ความยาวสูงสุด</label><input type="number" id="tgMax" min="2" max="15" value="4"></div>
+          <div class="field"><label for="tgCount">จำนวนคำ</label><input type="number" id="tgCount" min="1" max="100" value="10"></div>
+          <label class="checkbox-field"><input type="checkbox" id="tgStrict"> โหมดเข้มงวด (พิมพ์ผิดแล้วเริ่มใหม่)</label>
+          <button class="btn btn-primary" id="tgStartBtn">▶ เริ่มเกม</button>
+        </div>
+      </div>
+      <div id="typingPlay" style="display:none"></div>
+    </div>
+
+    <div class="panel-card" id="racksGamePanel" style="display:none">
+      <h2>🁢 Random Racks</h2>
+      <p class="panel-sub">สุ่มตัวอักษรมาเป็น Rack แล้วหาคำศัพท์ทั้งหมดที่ประกอบขึ้นจากตัวอักษรใน Rack นั้น</p>
+      <div id="racksSetup">
+        <div class="control-row">
+          <div class="field"><label for="rgSize">ขนาด Rack</label><input type="number" id="rgSize" min="4" max="10" value="7"></div>
+          <button class="btn btn-primary" id="rgStartBtn">▶ สุ่ม Rack ใหม่</button>
+        </div>
+      </div>
+      <div id="racksPlay" style="display:none"></div>
     </div>
   </section>
 
@@ -160,6 +239,22 @@
 
       <button class="btn btn-danger btn-sm" id="resetBtn">♻ Reset ความคืบหน้าทั้งหมด</button>
     </div>
+
+    <div class="panel-card">
+      <h2>นำเข้า / ส่งออกข้อมูล</h2>
+      <p class="panel-sub">สำรองความคืบหน้าไว้เป็นไฟล์ หรือเพิ่มคำศัพท์ของคุณเองเข้าไปใช้งานร่วมกับพจนานุกรม CSW24</p>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-sm" id="exportProgressBtn">⬇ ส่งออกความคืบหน้า (JSON)</button>
+        <label class="btn btn-outline btn-sm" for="importProgressInput">⬆ นำเข้าความคืบหน้า (JSON)</label>
+        <input type="file" id="importProgressInput" accept=".json" class="file-input-hidden">
+      </div>
+      <div class="btn-row" style="margin-top:0.8rem">
+        <label class="btn btn-outline btn-sm" for="importWordsInput">⬆ นำเข้ารายการคำศัพท์ของฉัน (.txt)</label>
+        <input type="file" id="importWordsInput" accept=".txt" class="file-input-hidden">
+        <label class="checkbox-field"><input type="checkbox" id="includeCustomWords" checked> รวมคำที่นำเข้าเองตอนสุ่ม/ค้นหา</label>
+      </div>
+      <p class="field-hint" id="customWordsCount"></p>
+    </div>
   </section>
 
 </main>
@@ -168,7 +263,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="words-data.js"></script>
-<script src="app.js"></script>
+<script src="js/words-data.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
