@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSW24 Word Lab — เจนคำศัพท์ & ทบทวนแบบ Flashcard/Anagram</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="logo-tiles">
+    <span class="logo-tile">C</span>
+    <span class="logo-tile">S</span>
+    <span class="logo-tile">W</span>
+    <span class="logo-tile">2</span>
+    <span class="logo-tile">4</span>
+  </div>
+  <h1>CSW24 Word Lab</h1>
+  <p>เจนคำศัพท์ · หา Anagram · เก็บลง Cardbox · ทบทวนด้วย Flashcard &amp; Active Recall</p>
+</header>
+
+<nav class="tab-nav">
+  <button class="tab-btn active" data-tab="generate">📝 สร้างคำศัพท์</button>
+  <button class="tab-btn" data-tab="quiz">🎯 แบบทดสอบ</button>
+  <button class="tab-btn" data-tab="cardbox">🗂️ Cardbox</button>
+  <button class="tab-btn" data-tab="dashboard">📊 Dashboard</button>
+</nav>
+
+<main>
+
+  <!-- ============== GENERATE TAB ============== -->
+  <section id="tab-generate" class="tab-panel active">
+    <div class="panel-card">
+      <h2>สร้างรายการคำศัพท์</h2>
+      <p class="panel-sub">สุ่มคำจากพจนานุกรม CSW24 กำหนดความยาวตัวอักษร (ช่วง) และจำนวนคำที่ต้องการ พร้อมดู Anagram ของแต่ละคำได้</p>
+      <div class="control-row">
+        <div class="field">
+          <label for="genMin">ความยาวต่ำสุด</label>
+          <input type="number" id="genMin" min="2" max="15" value="3">
+        </div>
+        <div class="field">
+          <label for="genMax">ความยาวสูงสุด</label>
+          <input type="number" id="genMax" min="2" max="15" value="5">
+        </div>
+        <div class="field">
+          <label for="genCount">จำนวนคำ</label>
+          <input type="number" id="genCount" min="1" max="300" value="20">
+        </div>
+        <button class="btn btn-primary" id="genBtn">🎲 สุ่มคำศัพท์</button>
+      </div>
+      <p class="field-hint">พจนานุกรมทั้งหมดมี <span id="totalWordsLabel">-</span> คำ ความยาวตั้งแต่ 2–15 ตัวอักษร</p>
+    </div>
+
+    <div class="panel-card" id="genResultsPanel" style="display:none">
+      <div id="exportCapture">
+        <h2 id="exportTitle">รายการคำศัพท์</h2>
+        <div id="genResults"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-sm" id="exportPdfBtn">⬇ Export PDF</button>
+        <button class="btn btn-outline btn-sm" id="exportJpgBtn">⬇ Export JPG</button>
+        <button class="btn btn-outline btn-sm" id="exportPngBtn">⬇ Export PNG</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== QUIZ TAB ============== -->
+  <section id="tab-quiz" class="tab-panel">
+    <div class="panel-card">
+      <h2>แบบทดสอบ — เลือกคำเก็บใน Cardbox</h2>
+      <p class="panel-sub">สุ่มคำศัพท์ชุดใหม่ (ค่าเริ่มต้น 50 คำ) เลือกคำที่ถูกใจอยากจำ แล้วกด Save to Cardbox เพื่อเก็บไว้ทบทวน</p>
+      <div class="control-row">
+        <div class="field">
+          <label for="quizMin">ความยาวต่ำสุด</label>
+          <input type="number" id="quizMin" min="2" max="15" value="4">
+        </div>
+        <div class="field">
+          <label for="quizMax">ความยาวสูงสุด</label>
+          <input type="number" id="quizMax" min="2" max="15" value="7">
+        </div>
+        <div class="field">
+          <label for="quizCount">จำนวนคำ</label>
+          <input type="number" id="quizCount" min="5" max="200" value="50">
+        </div>
+        <button class="btn btn-primary" id="quizGenBtn">🎲 สุ่มคำศัพท์</button>
+      </div>
+    </div>
+
+    <div class="panel-card" id="quizListPanel" style="display:none">
+      <div class="quiz-list-head">
+        <label class="checkbox-field"><input type="checkbox" id="quizSelectAll"> เลือกทั้งหมด</label>
+        <span class="selected-count" id="quizSelectedCount">เลือกแล้ว 0 คำ</span>
+      </div>
+      <div id="quizList"></div>
+      <div class="btn-row">
+        <button class="btn btn-teal" id="quizSaveBtn">💾 Save to Cardbox</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== CARDBOX TAB ============== -->
+  <section id="tab-cardbox" class="tab-panel">
+    <div class="panel-card">
+      <h2>การ์ดของฉัน (Cardbox)</h2>
+      <p class="panel-sub">คำศัพท์ที่บันทึกไว้ — เลือกรูปแบบทบทวนแล้วเริ่มเรียนได้เลย ความคืบหน้าจะถูกเก็บไว้ในเครื่องอัตโนมัติ</p>
+
+      <div id="cardboxSetup">
+        <div class="control-row">
+          <div class="field">
+            <label for="studyMode">รูปแบบ Quiz</label>
+            <select id="studyMode">
+              <option value="flashcard">Flashcard</option>
+              <option value="anagram">Anagram</option>
+              <option value="recall">Active Recall</option>
+            </select>
+          </div>
+          <div class="field" id="anagramOrderField">
+            <label for="anagramOrder">การเรียงตัวอักษร</label>
+            <select id="anagramOrder">
+              <option value="alpha">เรียงตามตัวอักษร (A→Z)</option>
+              <option value="random">สุ่ม</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="studyCount">จำนวนคำที่ทบทวน</label>
+            <input type="number" id="studyCount" min="1" value="10">
+          </div>
+          <button class="btn btn-primary" id="startStudyBtn">▶ เริ่มทบทวน</button>
+        </div>
+      </div>
+
+      <p style="margin-top:0.6rem"><strong id="cardboxCount">0</strong> คำใน Cardbox</p>
+      <div id="cardboxList"></div>
+    </div>
+
+    <div class="panel-card" id="studySession">
+      <div class="session-progress" id="sessionProgressLabel"></div>
+      <div class="session-bar"><div class="session-bar-fill" id="sessionBarFill" style="width:0%"></div></div>
+      <div id="sessionArea"></div>
+    </div>
+  </section>
+
+  <!-- ============== DASHBOARD TAB ============== -->
+  <section id="tab-dashboard" class="tab-panel">
+    <div class="panel-card">
+      <h2>Dashboard</h2>
+      <p class="panel-sub">ภาพรวมความคืบหน้าในการเรียนคำศัพท์ของคุณ ข้อมูลทั้งหมดเก็บไว้ในเบราว์เซอร์นี้เท่านั้น</p>
+
+      <div class="stat-grid" id="dashStatGrid"></div>
+
+      <div class="donut-wrap">
+        <div class="donut" id="dashDonut" style="--p:0">
+          <div class="donut-inner"><span class="pct" id="dashPct">0%</span><span class="pct-label">เชี่ยวชาญ</span></div>
+        </div>
+        <div class="legend" id="dashLegend"></div>
+      </div>
+
+      <button class="btn btn-danger btn-sm" id="resetBtn">♻ Reset ความคืบหน้าทั้งหมด</button>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="js/words-data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
