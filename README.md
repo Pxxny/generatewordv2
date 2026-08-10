@@ -1,2 +1,4 @@
-# generatewordv2
-Another Generate Word // IN DEV
+# peonycsw24
+
+- NEW DESIGNING
+- NEW SYSTEM
