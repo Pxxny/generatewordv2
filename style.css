@@ -527,3 +527,57 @@ main {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* ---------- additions: word browser chips ---------- */
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.length-chip {
+  background: var(--board-2);
+  border: 1px solid var(--rail);
+  color: var(--cream);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.length-chip:hover { border-color: var(--teal); }
+.length-chip.active { background: var(--brass); color: var(--ink); border-color: var(--brass-deep); }
+
+/* ---------- additions: typing minigame letter states ---------- */
+
+.letter-tile.correct-letter { background: var(--teal); color: #06201b; box-shadow: 0 2px 0 var(--teal-deep); }
+.letter-tile.wrong-letter { background: var(--clay); color: var(--cream); box-shadow: 0 2px 0 var(--clay-deep); }
+
+#tgInput {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 1.05rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 7px;
+  border: none;
+  background: var(--cream);
+  color: var(--ink);
+  width: 14rem;
+  text-align: center;
+  margin-top: 0.4rem;
+}
+
+/* ---------- additions: anagram chip missed state (racks reveal) ---------- */
+
+.anagram-chip.missed { background: #3a4a42; color: #9db6a8; }
+
+/* ---------- additions: file input trigger label ---------- */
+
+.file-input-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
