@@ -102,7 +102,9 @@
     lang: 'th',
     themePreset: 'felt',
     customColors: null, // {board,brass,teal,cream} or null
-    dashMin: 5, dashMax: 9, dashCount: 12
+    dashMin: 5, dashMax: 9, dashCount: 12,
+    dueTimePreset: '24h', // 1h,5h,12h,24h,1d,2d,5d,10d,30d,custom
+    dueTimeCustomValue: 3, dueTimeCustomUnit: 'd'
   };
 
   function loadSettings() {
@@ -411,12 +413,17 @@
 
   // ---------- shared word-row + anagram toggle rendering ----------
 
-  function wordRowHTML(word) {
+  function wordRowHTML(word, opts) {
     uidCounter++;
     const uid = uidCounter;
+    const withSelect = opts && opts.selectable;
+    const checkbox = withSelect
+      ? '<input type="checkbox" class="browse-select-check" data-word="' + word + '" style="width:1.05rem;height:1.05rem;accent-color:var(--brass);cursor:pointer;flex-shrink:0">'
+      : '';
     return (
       '<div class="word-row" data-word="' + word + '">' +
         '<div class="word-row-top">' +
+          (withSelect ? checkbox : '') +
           '<div>' + tileRowHTML(word) + '</div>' +
           '<div class="word-meta">' + word.length + ' ตัวอักษร · ' + wordScore(word) + ' คะแนน</div>' +
           '<button class="anagram-toggle" data-uid="' + uid + '" data-word="' + word + '">🔤 ดู Anagram</button>' +
@@ -487,11 +494,28 @@
     localStorage.setItem(CARDBOX_KEY, JSON.stringify(list));
   }
 
+  const HOUR_MS = 3600000;
+
+  const DUE_PRESET_MS = {
+    '1h': 1 * HOUR_MS, '5h': 5 * HOUR_MS, '12h': 12 * HOUR_MS, '24h': 24 * HOUR_MS,
+    '1d': 1 * DAY_MS, '2d': 2 * DAY_MS, '5d': 5 * DAY_MS, '10d': 10 * DAY_MS, '30d': 30 * DAY_MS
+  };
+
+  function currentDueOffsetMs() {
+    if (settings.dueTimePreset === 'custom') {
+      const val = Math.max(1, parseInt(settings.dueTimeCustomValue, 10) || 1);
+      const unitMs = settings.dueTimeCustomUnit === 'h' ? HOUR_MS : DAY_MS;
+      return val * unitMs;
+    }
+    return DUE_PRESET_MS[settings.dueTimePreset] || DUE_PRESET_MS['24h'];
+  }
+
   function newCard(word) {
+    const now = Date.now();
     return {
-      word: word, addedAt: Date.now(), status: 'new',
+      word: word, addedAt: now, status: 'new',
       correct: 0, incorrect: 0, lastReviewed: null,
-      interval: 0, ease: 2.5, reps: 0, due: Date.now()
+      interval: 0, ease: 2.5, reps: 0, due: now + currentDueOffsetMs()
     };
   }
 
@@ -579,6 +603,7 @@
         if (btn.dataset.tab === 'browse' && !browseInitialized) {
           browseInitialized = true;
           initBrowseChips();
+          initBrowseSelection();
           runBrowseSearch();
         }
       });
@@ -822,6 +847,66 @@
       renderCardboxTab();
       renderDashboard();
       showToast('รีเซ็ตความคืบหน้าเรียบร้อยแล้ว');
+    });
+  }
+
+  // ---------- Due-time preset controls ----------
+
+  const DUE_PRESET_LABEL_TH = {
+    '1h': '1 ชั่วโมง', '5h': '5 ชั่วโมง', '12h': '12 ชั่วโมง', '24h': '24 ชั่วโมง',
+    '1d': '1 วัน', '2d': '2 วัน', '5d': '5 วัน', '10d': '10 วัน', '30d': '30 วัน'
+  };
+
+  function renderDueTimeSummary() {
+    const summaryEl = document.getElementById('dueTimeSummary');
+    if (!summaryEl) return;
+    if (settings.dueTimePreset === 'custom') {
+      const val = Math.max(1, parseInt(settings.dueTimeCustomValue, 10) || 1);
+      const unitLabel = settings.dueTimeCustomUnit === 'h' ? (val === 1 ? 'ชั่วโมง' : 'ชั่วโมง') : (val === 1 ? 'วัน' : 'วัน');
+      summaryEl.textContent = val + ' ' + unitLabel;
+    } else {
+      summaryEl.textContent = DUE_PRESET_LABEL_TH[settings.dueTimePreset] || '24 ชั่วโมง';
+    }
+  }
+
+  function initDueTimeControls() {
+    const chipWrap = document.getElementById('dueTimePresetChips');
+    const customRow = document.getElementById('dueTimeCustomRow');
+    const customValueInput = document.getElementById('dueTimeCustomValue');
+    const customUnitSelect = document.getElementById('dueTimeCustomUnit');
+    if (!chipWrap) return;
+
+    // restore saved state into UI
+    chipWrap.querySelectorAll('.mode-chip').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.due === settings.dueTimePreset);
+    });
+    customRow.style.display = settings.dueTimePreset === 'custom' ? '' : 'none';
+    customValueInput.value = settings.dueTimeCustomValue;
+    customUnitSelect.value = settings.dueTimeCustomUnit;
+    renderDueTimeSummary();
+
+    chipWrap.querySelectorAll('.mode-chip').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        chipWrap.querySelectorAll('.mode-chip').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        settings.dueTimePreset = btn.dataset.due;
+        customRow.style.display = settings.dueTimePreset === 'custom' ? '' : 'none';
+        saveSettings();
+        renderDueTimeSummary();
+      });
+    });
+
+    customValueInput.addEventListener('change', function () {
+      settings.dueTimeCustomValue = Math.max(1, parseInt(customValueInput.value, 10) || 1);
+      customValueInput.value = settings.dueTimeCustomValue;
+      saveSettings();
+      renderDueTimeSummary();
+    });
+
+    customUnitSelect.addEventListener('change', function () {
+      settings.dueTimeCustomUnit = customUnitSelect.value;
+      saveSettings();
+      renderDueTimeSummary();
     });
   }
 
@@ -1179,9 +1264,66 @@
     });
   }
 
+  // ---------- Dedicated Cardbox export/import (replace semantics) ----------
+
+  function initCardboxImportExport() {
+    const exportBtn = document.getElementById('exportCardboxBtn');
+    const importInput = document.getElementById('importCardboxInput');
+    if (!exportBtn || !importInput) return;
+
+    exportBtn.addEventListener('click', function () {
+      const box = loadCardbox();
+      if (!box.length) { showToast('Cardbox ว่างอยู่ ไม่มีอะไรให้ Export'); return; }
+      const blob = new Blob([JSON.stringify(box, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const today = new Date().toISOString().slice(0, 10);
+      downloadDataUrl(url, 'csw24-cardbox-' + today + '.json');
+      showToast('Export Cardbox แล้ว (' + box.length + ' คำ) — เก็บไฟล์นี้ไว้ก่อน Import ชุดใหม่');
+    });
+
+    importInput.addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function () {
+        try {
+          const imported = JSON.parse(reader.result);
+          if (!Array.isArray(imported)) throw new Error('bad format');
+          const currentCount = loadCardbox().length;
+          if (currentCount > 0) {
+            const ok = confirm(
+              'Cardbox ปัจจุบันมี ' + currentCount + ' คำ การ Import จะ "แทนที่ทั้งหมด" ด้วยไฟล์นี้ ' +
+              '(แนะนำ Export เก็บไว้ก่อนถ้ายังไม่ได้ทำ) ต้องการดำเนินการต่อหรือไม่?'
+            );
+            if (!ok) { e.target.value = ''; return; }
+          }
+          const cleaned = [];
+          const seen = new Set();
+          imported.forEach(function (item) {
+            if (!item || !item.word) return;
+            const word = String(item.word).toUpperCase();
+            if (seen.has(word)) return;
+            seen.add(word);
+            const card = Object.assign(newCard(word), item, { word: word });
+            patchLegacyCard(card);
+            cleaned.push(card);
+          });
+          saveCardbox(cleaned);
+          renderCardboxTab();
+          renderDashboard();
+          showToast('Import Cardbox แล้ว — แทนที่ด้วย ' + cleaned.length + ' คำ');
+        } catch (err) {
+          showToast('ไฟล์ไม่ถูกต้อง ไม่สามารถ Import ได้');
+        }
+        e.target.value = '';
+      };
+      reader.readAsText(file);
+    });
+  }
+
   // ---------- Word browser tab ----------
 
-  const browseState = { activeLength: 'all', results: [], shown: 0 };
+  const browseState = { activeLength: 'all', results: [], shown: 0, selected: new Set() };
 
   function initBrowseChips() {
     const wrap = document.getElementById('browseLengthChips');
@@ -1214,6 +1356,50 @@
     document.getElementById('browseLoadMoreBtn').addEventListener('click', function () { renderBrowseResults(false); });
   }
 
+  function initBrowseSelection() {
+    document.getElementById('browseSelectAll').addEventListener('change', function (e) {
+      const checked = e.target.checked;
+      document.querySelectorAll('.browse-select-check').forEach(function (cb) {
+        cb.checked = checked;
+        if (checked) browseState.selected.add(cb.dataset.word);
+        else browseState.selected.delete(cb.dataset.word);
+      });
+      updateBrowseSelectedCount();
+    });
+
+    document.getElementById('browseSelectRandomBtn').addEventListener('click', function () {
+      if (!browseState.results.length) { showToast('ยังไม่มีผลลัพธ์ให้เลือก — ค้นหาก่อน'); return; }
+      let n = parseInt(document.getElementById('browseRandomCount').value, 10) || 10;
+      n = Math.max(1, Math.min(n, browseState.results.length));
+      const picks = shuffle(browseState.results.slice()).slice(0, n);
+      browseState.selected = new Set(picks);
+      // make sure the random picks are loaded/rendered so their checkboxes exist
+      const neededShown = Math.max.apply(null, picks.map(function (w) { return browseState.results.indexOf(w); })) + 1;
+      while (browseState.shown < neededShown && browseState.shown < browseState.results.length) {
+        renderBrowseResults(false);
+      }
+      document.querySelectorAll('.browse-select-check').forEach(function (cb) {
+        cb.checked = browseState.selected.has(cb.dataset.word);
+      });
+      updateBrowseSelectedCount();
+      showToast('สุ่มเลือกแล้ว ' + browseState.selected.size + ' คำ');
+    });
+
+    document.getElementById('browseClearSelectionBtn').addEventListener('click', function () {
+      browseState.selected = new Set();
+      document.querySelectorAll('.browse-select-check').forEach(function (cb) { cb.checked = false; });
+      updateBrowseSelectedCount();
+    });
+
+    document.getElementById('browseSaveCardboxBtn').addEventListener('click', function () {
+      if (!browseState.selected.size) { showToast('กรุณาเลือกคำศัพท์อย่างน้อย 1 คำ (หรือกด Select All / Select Random)'); return; }
+      const added = addWordsToCardbox(Array.from(browseState.selected));
+      showToast('บันทึกลง Cardbox แล้ว ' + added + ' คำ');
+      renderCardboxTab();
+      renderDashboard();
+    });
+  }
+
   function wordMatchesFilters(word, f) {
     if (f.starts && !word.startsWith(f.starts)) return false;
     if (f.ends && !word.endsWith(f.ends)) return false;
@@ -1226,6 +1412,26 @@
     if (f.scoreMin != null && wordScore(word) < f.scoreMin) return false;
     if (f.scoreMax != null && wordScore(word) > f.scoreMax) return false;
     return true;
+  }
+
+  function updateBrowseSelectedCount() {
+    document.getElementById('browseSelectedCount').textContent = 'เลือกแล้ว ' + browseState.selected.size + ' คำ';
+    const allChecks = document.querySelectorAll('.browse-select-check');
+    const allChecked = allChecks.length > 0 && Array.from(allChecks).every(function (cb) { return cb.checked; });
+    document.getElementById('browseSelectAll').checked = allChecked;
+  }
+
+  function bindBrowseSelectChecks(container) {
+    container.querySelectorAll('.browse-select-check').forEach(function (cb) {
+      if (cb.dataset.bound) return;
+      cb.dataset.bound = '1';
+      cb.checked = browseState.selected.has(cb.dataset.word);
+      cb.addEventListener('change', function () {
+        if (cb.checked) browseState.selected.add(cb.dataset.word);
+        else browseState.selected.delete(cb.dataset.word);
+        updateBrowseSelectedCount();
+      });
+    });
   }
 
   function runBrowseSearch() {
@@ -1254,66 +1460,185 @@
     const results = hasFilters ? candidates.filter(function (w) { return wordMatchesFilters(w, f); }) : candidates;
     browseState.results = results;
     browseState.shown = 0;
+    browseState.selected = new Set();
 
     document.getElementById('browseResultCount').textContent = 'พบ ' + results.length.toLocaleString('en-US') + ' คำ';
     renderBrowseResults(true);
+    updateBrowseSelectedCount();
   }
 
   function renderBrowseResults(reset) {
     const wrap = document.getElementById('browseResults');
     if (reset) wrap.innerHTML = '';
     const slice = browseState.results.slice(browseState.shown, browseState.shown + PAGE_SIZE);
-    wrap.insertAdjacentHTML('beforeend', slice.map(wordRowHTML).join(''));
+    wrap.insertAdjacentHTML('beforeend', slice.map(function (w) { return wordRowHTML(w, { selectable: true }); }).join(''));
     bindAnagramToggles(wrap);
+    bindBrowseSelectChecks(wrap);
     browseState.shown += slice.length;
     document.getElementById('browseLoadMoreWrap').style.display =
       browseState.shown < browseState.results.length ? '' : 'none';
+    updateBrowseSelectedCount();
   }
 
   // ---------- Minigame: typing ----------
 
-  const tg = { words: [], index: 0, strict: false, mistakes: 0, startTime: 0, timerHandle: null, mode: 'random', showAnagram: false, typed: [], typedSelected: new Set() };
+  const TG_SAVE_KEY = 'csw24_typing_progress_v1';
 
-  function tgWordsForLetterMode(min, max, count) {
-    // Sequential A→Z pull across the selected length range, instead of random.
-    let pool = [];
-    for (let L = min; L <= max; L++) pool = pool.concat(lengthPool(L));
+  const tg = { words: [], index: 0, strict: false, mistakes: 0, startTime: 0, timerHandle: null, mode: 'random', showAnagram: false, typed: [], typedSelected: new Set(), containsAll: '' };
+
+  function tgWordsForLetterMode(len) {
+    // All words of a single chosen length, sorted A→Z.
+    let pool = lengthPool(len).slice();
     pool = Array.from(new Set(pool)).sort();
-    return pool.slice(0, count);
+    return pool;
+  }
+
+  function tgApplyContainsAllFilter(words, lettersStr) {
+    const letters = (lettersStr || '').toUpperCase().replace(/[^A-Z]/g, '').split('');
+    if (!letters.length) return words;
+    return words.filter(function (w) {
+      return letters.every(function (ch) { return w.indexOf(ch) !== -1; });
+    });
+  }
+
+  function tgWordsFromCardbox() {
+    return loadCardbox().map(function (c) { return c.word; });
+  }
+
+  function tgWordsFromSuggested() {
+    if (!dashSuggestedWords) generateDashSuggested();
+    return (dashSuggestedWords || []).slice();
+  }
+
+  function tgSaveProgress() {
+    try {
+      localStorage.setItem(TG_SAVE_KEY, JSON.stringify({
+        words: tg.words, index: tg.index, mistakes: tg.mistakes, startTime: tg.startTime,
+        strict: tg.strict, showAnagram: tg.showAnagram, mode: tg.mode, containsAll: tg.containsAll,
+        typed: tg.typed
+      }));
+    } catch (e) { /* ignore */ }
+  }
+
+  function tgLoadProgress() {
+    try {
+      const raw = localStorage.getItem(TG_SAVE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || !Array.isArray(data.words) || !data.words.length) return null;
+      if (typeof data.index !== 'number' || data.index >= data.words.length) return null;
+      return data;
+    } catch (e) { return null; }
+  }
+
+  function tgClearProgress() {
+    localStorage.removeItem(TG_SAVE_KEY);
+  }
+
+  function tgRefreshResumeBtn() {
+    const btn = document.getElementById('tgResumeBtn');
+    if (!btn) return;
+    const saved = tgLoadProgress();
+    if (saved) {
+      btn.style.display = '';
+      btn.textContent = '↩ เล่นต่อจากที่ค้างไว้ (' + saved.index + '/' + saved.words.length + ')';
+    } else {
+      btn.style.display = 'none';
+    }
   }
 
   function initTypingGame() {
-    const modeRandomBtn = document.getElementById('tgModeRandomBtn');
-    const modeLetterBtn = document.getElementById('tgModeLetterBtn');
+    const modeBtns = {
+      random: document.getElementById('tgModeRandomBtn'),
+      letter: document.getElementById('tgModeLetterBtn'),
+      cardbox: document.getElementById('tgModeCardboxBtn'),
+      suggested: document.getElementById('tgModeSuggestedBtn')
+    };
+    const rangeRow = document.getElementById('tgRangeRow');
+    const countField = document.getElementById('tgCountField');
+    const letterNote = document.getElementById('tgLetterNote');
+    const maxField = document.getElementById('tgMax').closest('.field');
+
     function refreshModeChips() {
-      modeRandomBtn.classList.toggle('active', tg.mode === 'random');
-      modeLetterBtn.classList.toggle('active', tg.mode === 'letter');
+      Object.keys(modeBtns).forEach(function (m) { modeBtns[m].classList.toggle('active', tg.mode === m); });
+      const isLetter = tg.mode === 'letter';
+      const isSourceMode = tg.mode === 'cardbox' || tg.mode === 'suggested';
+      rangeRow.style.display = isSourceMode ? 'none' : '';
+      letterNote.style.display = isLetter ? '' : 'none';
+      countField.style.display = isLetter ? 'none' : '';
+      if (maxField) maxField.style.display = isLetter ? 'none' : '';
     }
-    modeRandomBtn.addEventListener('click', function () { tg.mode = 'random'; refreshModeChips(); });
-    modeLetterBtn.addEventListener('click', function () { tg.mode = 'letter'; refreshModeChips(); });
+    Object.keys(modeBtns).forEach(function (m) {
+      modeBtns[m].addEventListener('click', function () { tg.mode = m; refreshModeChips(); });
+    });
     refreshModeChips();
 
-    document.getElementById('tgStartBtn').addEventListener('click', function () {
-      let min = parseInt(document.getElementById('tgMin').value, 10) || CSW24_MIN_LEN;
-      let max = parseInt(document.getElementById('tgMax').value, 10) || CSW24_MAX_LEN;
-      let count = parseInt(document.getElementById('tgCount').value, 10) || 10;
-      min = Math.max(CSW24_MIN_LEN, Math.min(min, CSW24_MAX_LEN));
-      max = Math.max(CSW24_MIN_LEN, Math.min(max, CSW24_MAX_LEN));
-      if (min > max) { const t2 = min; min = max; max = t2; }
-      count = Math.max(1, Math.min(count, 100));
+    const containsAllToggle = document.getElementById('tgContainsAllToggle');
+    const containsAllField = document.getElementById('tgContainsAllField');
+    containsAllToggle.addEventListener('change', function () {
+      containsAllField.style.display = containsAllToggle.checked ? '' : 'none';
+    });
 
-      const words = tg.mode === 'letter' ? tgWordsForLetterMode(min, max, count) : pickRandomWords(min, max, count);
-      if (!words.length) { showToast('ไม่พบคำศัพท์ในช่วงความยาวที่เลือก'); return; }
+    document.getElementById('tgStartBtn').addEventListener('click', function () {
+      let words;
+      if (tg.mode === 'letter') {
+        let len = parseInt(document.getElementById('tgMin').value, 10) || CSW24_MIN_LEN;
+        len = Math.max(CSW24_MIN_LEN, Math.min(len, CSW24_MAX_LEN));
+        words = tgWordsForLetterMode(len);
+      } else if (tg.mode === 'cardbox') {
+        words = tgWordsFromCardbox();
+        if (!words.length) { showToast('Cardbox ยังไม่มีคำศัพท์'); return; }
+      } else if (tg.mode === 'suggested') {
+        words = tgWordsFromSuggested();
+        if (!words.length) { showToast('ยังไม่มีคำแนะนำจาก Dashboard'); return; }
+      } else {
+        let min = parseInt(document.getElementById('tgMin').value, 10) || CSW24_MIN_LEN;
+        let max = parseInt(document.getElementById('tgMax').value, 10) || CSW24_MAX_LEN;
+        let count = parseInt(document.getElementById('tgCount').value, 10) || 10;
+        min = Math.max(CSW24_MIN_LEN, Math.min(min, CSW24_MAX_LEN));
+        max = Math.max(CSW24_MIN_LEN, Math.min(max, CSW24_MAX_LEN));
+        if (min > max) { const t2 = min; min = max; max = t2; }
+        count = Math.max(1, Math.min(count, 100));
+        words = pickRandomWords(min, max, count);
+      }
+
+      const containsAll = containsAllToggle.checked ? document.getElementById('tgContainsAllInput').value : '';
+      if (containsAll) words = tgApplyContainsAllFilter(words, containsAll);
+
+      if (!words.length) { showToast('ไม่พบคำศัพท์ที่ตรงกับเงื่อนไขที่เลือก'); return; }
 
       tg.words = words;
       tg.strict = document.getElementById('tgStrict').checked;
       tg.showAnagram = document.getElementById('tgShowAnagramToggle').checked;
+      tg.containsAll = containsAll;
       tg.typed = [];
       tg.typedSelected = new Set();
       tgRestart();
       document.getElementById('typingPlay').style.display = '';
       document.getElementById('tgTypedPanel').style.display = 'none';
     });
+
+    document.getElementById('tgResumeBtn').addEventListener('click', function () {
+      const saved = tgLoadProgress();
+      if (!saved) { tgRefreshResumeBtn(); return; }
+      tg.words = saved.words;
+      tg.index = saved.index;
+      tg.mistakes = saved.mistakes || 0;
+      tg.startTime = saved.startTime || Date.now();
+      tg.strict = !!saved.strict;
+      tg.showAnagram = !!saved.showAnagram;
+      tg.mode = saved.mode || 'random';
+      tg.containsAll = saved.containsAll || '';
+      tg.typed = saved.typed || [];
+      tg.typedSelected = new Set();
+      if (tg.timerHandle) clearInterval(tg.timerHandle);
+      tg.timerHandle = setInterval(tgUpdateTimer, 500);
+      tgRenderPlay();
+      document.getElementById('typingPlay').style.display = '';
+      document.getElementById('tgTypedPanel').style.display = 'none';
+    });
+
+    tgRefreshResumeBtn();
   }
 
   function tgRestart() {
@@ -1322,6 +1647,7 @@
     tg.startTime = Date.now();
     if (tg.timerHandle) clearInterval(tg.timerHandle);
     tg.timerHandle = setInterval(tgUpdateTimer, 500);
+    tgSaveProgress();
     tgRenderPlay();
   }
 
@@ -1413,8 +1739,9 @@
     if (val === word) {
       input.disabled = true;
       tg.typed.push(word);
+      tg.index++;
+      tgSaveProgress();
       setTimeout(function () {
-        tg.index++;
         if (tg.index >= tg.words.length) tgFinish();
         else tgRenderPlay();
       }, 200);
@@ -1423,6 +1750,7 @@
 
   function tgFinish() {
     if (tg.timerHandle) { clearInterval(tg.timerHandle); tg.timerHandle = null; }
+    tgClearProgress();
     const elapsed = Date.now() - tg.startTime;
     const area = document.getElementById('typingPlay');
     area.innerHTML =
@@ -1439,6 +1767,7 @@
       tgRestart();
     });
     tgRenderTypedPanel();
+    tgRefreshResumeBtn();
   }
 
   // ---------- Minigame typing: "typed words so far" review + save panel ----------
@@ -1668,7 +1997,9 @@
     initGenerator();
     initQuizTab();
     initCardboxTab();
+    initDueTimeControls();
     initImportExport();
+    initCardboxImportExport();
     initTypingGame();
     initTgTypedPanel();
     initRacksGame();
