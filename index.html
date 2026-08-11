@@ -6,7 +6,7 @@
 <title>CSW24 Word Lab — เจนคำศัพท์ & ทบทวนแบบ Flashcard/Anagram</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
@@ -18,40 +18,41 @@
     <span class="logo-tile">2</span>
     <span class="logo-tile">4</span>
   </div>
-  <h1>CSW24 Word Lab</h1>
-  <p>เจนคำศัพท์ · หา Anagram · เก็บลง Cardbox · ทบทวนแบบ Spaced Repetition · Minigame</p>
+  <h1 data-i18n="app.title">CSW24 Word Lab</h1>
+  <p data-i18n="app.subtitle">เจนคำศัพท์ · หา Anagram · เก็บลง Cardbox · ทบทวนแบบ Spaced Repetition · Minigame</p>
 </header>
 
 <nav class="tab-nav">
-  <button class="tab-btn active" data-tab="generate">📝 สร้างคำศัพท์</button>
-  <button class="tab-btn" data-tab="quiz">🎯 แบบทดสอบ</button>
-  <button class="tab-btn" data-tab="cardbox">🗂️ Cardbox</button>
-  <button class="tab-btn" data-tab="browse">📖 คลังคำศัพท์</button>
-  <button class="tab-btn" data-tab="minigame">🕹️ Minigame</button>
-  <button class="tab-btn" data-tab="dashboard">📊 Dashboard</button>
+  <button class="tab-btn" data-tab="dashboard" data-i18n="tab.dashboard">📊 Dashboard</button>
+  <button class="tab-btn" data-tab="generate" data-i18n="tab.generate">📝 สร้างคำศัพท์</button>
+  <button class="tab-btn" data-tab="quiz" data-i18n="tab.quiz">🎯 แบบทดสอบ</button>
+  <button class="tab-btn" data-tab="cardbox" data-i18n="tab.cardbox">🗂️ Cardbox</button>
+  <button class="tab-btn" data-tab="browse" data-i18n="tab.browse">📖 คลังคำศัพท์</button>
+  <button class="tab-btn" data-tab="minigame" data-i18n="tab.minigame">🕹️ Minigame</button>
+  <button class="tab-btn" id="settingsTabBtn" data-tab="settings" data-i18n="tab.settings">⚙️ Setting</button>
 </nav>
 
 <main>
 
   <!-- ============== GENERATE TAB ============== -->
-  <section id="tab-generate" class="tab-panel active">
+  <section id="tab-generate" class="tab-panel">
     <div class="panel-card">
-      <h2>สร้างรายการคำศัพท์</h2>
-      <p class="panel-sub">สุ่มคำจากพจนานุกรม CSW24 กำหนดความยาวตัวอักษร (ช่วง) และจำนวนคำที่ต้องการ พร้อมดู Anagram และคะแนนของแต่ละคำ</p>
+      <h2 data-i18n="gen.title">สร้างรายการคำศัพท์</h2>
+      <p class="panel-sub" data-i18n="gen.sub">สุ่มคำจากพจนานุกรม CSW24 กำหนดความยาวตัวอักษร (ช่วง) และจำนวนคำที่ต้องการ พร้อมดู Anagram และคะแนนของแต่ละคำ</p>
       <div class="control-row">
         <div class="field">
-          <label for="genMin">ความยาวต่ำสุด</label>
+          <label for="genMin" data-i18n="common.minLen">ความยาวต่ำสุด</label>
           <input type="number" id="genMin" min="2" max="15" value="3">
         </div>
         <div class="field">
-          <label for="genMax">ความยาวสูงสุด</label>
+          <label for="genMax" data-i18n="common.maxLen">ความยาวสูงสุด</label>
           <input type="number" id="genMax" min="2" max="15" value="5">
         </div>
         <div class="field">
-          <label for="genCount">จำนวนคำ</label>
+          <label for="genCount" data-i18n="common.wordCount">จำนวนคำ</label>
           <input type="number" id="genCount" min="1" max="300" value="20">
         </div>
-        <button class="btn btn-primary" id="genBtn">🎲 สุ่มคำศัพท์</button>
+        <button class="btn btn-primary" id="genBtn" data-i18n="common.randomize">🎲 สุ่มคำศัพท์</button>
       </div>
       <p class="field-hint">พจนานุกรมทั้งหมดมี <span id="totalWordsLabel">-</span> คำ ความยาวตั้งแต่ 2–15 ตัวอักษร</p>
     </div>
@@ -73,33 +74,33 @@
   <!-- ============== QUIZ TAB ============== -->
   <section id="tab-quiz" class="tab-panel">
     <div class="panel-card">
-      <h2>แบบทดสอบ — เลือกคำเก็บใน Cardbox</h2>
-      <p class="panel-sub">สุ่มคำศัพท์ชุดใหม่ (ค่าเริ่มต้น 50 คำ) เลือกคำที่ถูกใจอยากจำ แล้วกด Save to Cardbox เพื่อเก็บไว้ทบทวน</p>
+      <h2 data-i18n="quiz.title">แบบทดสอบ — เลือกคำเก็บใน Cardbox</h2>
+      <p class="panel-sub" data-i18n="quiz.sub">สุ่มคำศัพท์ชุดใหม่ (ค่าเริ่มต้น 50 คำ) เลือกคำที่ถูกใจอยากจำ แล้วกด Save to Cardbox เพื่อเก็บไว้ทบทวน</p>
       <div class="control-row">
         <div class="field">
-          <label for="quizMin">ความยาวต่ำสุด</label>
+          <label for="quizMin" data-i18n="common.minLen">ความยาวต่ำสุด</label>
           <input type="number" id="quizMin" min="2" max="15" value="4">
         </div>
         <div class="field">
-          <label for="quizMax">ความยาวสูงสุด</label>
+          <label for="quizMax" data-i18n="common.maxLen">ความยาวสูงสุด</label>
           <input type="number" id="quizMax" min="2" max="15" value="7">
         </div>
         <div class="field">
-          <label for="quizCount">จำนวนคำ</label>
+          <label for="quizCount" data-i18n="common.wordCount">จำนวนคำ</label>
           <input type="number" id="quizCount" min="5" max="200" value="50">
         </div>
-        <button class="btn btn-primary" id="quizGenBtn">🎲 สุ่มคำศัพท์</button>
+        <button class="btn btn-primary" id="quizGenBtn" data-i18n="common.randomize">🎲 สุ่มคำศัพท์</button>
       </div>
     </div>
 
     <div class="panel-card" id="quizListPanel" style="display:none">
       <div class="quiz-list-head">
-        <label class="checkbox-field"><input type="checkbox" id="quizSelectAll"> เลือกทั้งหมด</label>
+        <label class="checkbox-field"><input type="checkbox" id="quizSelectAll"> <span data-i18n="common.selectAll">เลือกทั้งหมด</span></label>
         <span class="selected-count" id="quizSelectedCount">เลือกแล้ว 0 คำ</span>
       </div>
       <div id="quizList"></div>
       <div class="btn-row">
-        <button class="btn btn-teal" id="quizSaveBtn">💾 Save to Cardbox</button>
+        <button class="btn btn-teal" id="quizSaveBtn" data-i18n="common.saveToCardbox">💾 Save to Cardbox</button>
       </div>
     </div>
   </section>
@@ -107,13 +108,13 @@
   <!-- ============== CARDBOX TAB ============== -->
   <section id="tab-cardbox" class="tab-panel">
     <div class="panel-card">
-      <h2>การ์ดของฉัน (Cardbox)</h2>
+      <h2 data-i18n="cardbox.title">การ์ดของฉัน (Cardbox)</h2>
       <p class="panel-sub">คำศัพท์ที่บันทึกไว้ — เลือกรูปแบบทบทวนแล้วเริ่มเรียนได้เลย ระบบใช้ Spaced Repetition (SM-2 แบบย่อ) เพื่อจัดคิวคำที่ควรทบทวน ความคืบหน้าเก็บไว้ในเครื่องอัตโนมัติ</p>
 
       <div id="cardboxSetup">
         <div class="control-row">
           <div class="field">
-            <label for="studyMode">รูปแบบ Quiz</label>
+            <label for="studyMode" data-i18n="cardbox.studyMode">รูปแบบ Quiz</label>
             <select id="studyMode">
               <option value="flashcard">Flashcard</option>
               <option value="anagram">Anagram</option>
@@ -121,18 +122,18 @@
             </select>
           </div>
           <div class="field" id="anagramOrderField">
-            <label for="anagramOrder">การเรียงตัวอักษร</label>
+            <label for="anagramOrder" data-i18n="cardbox.anagramOrder">การเรียงตัวอักษร</label>
             <select id="anagramOrder">
               <option value="alpha">เรียงตามตัวอักษร (A→Z)</option>
               <option value="random">สุ่ม</option>
             </select>
           </div>
           <div class="field">
-            <label for="studyCount">จำนวนคำที่ทบทวน</label>
+            <label for="studyCount" data-i18n="cardbox.studyCount">จำนวนคำที่ทบทวน</label>
             <input type="number" id="studyCount" min="1" value="10">
           </div>
           <label class="checkbox-field"><input type="checkbox" id="dueOnlyToggle" checked> เฉพาะคำที่ถึงกำหนด</label>
-          <button class="btn btn-primary" id="startStudyBtn">▶ เริ่มทบทวน</button>
+          <button class="btn btn-primary" id="startStudyBtn" data-i18n="cardbox.start">▶ เริ่มทบทวน</button>
         </div>
       </div>
 
@@ -150,7 +151,7 @@
   <!-- ============== WORD BROWSER TAB ============== -->
   <section id="tab-browse" class="tab-panel">
     <div class="panel-card">
-      <h2>คลังคำศัพท์ทั้งหมด</h2>
+      <h2 data-i18n="browse.title">คลังคำศัพท์ทั้งหมด</h2>
       <p class="panel-sub">เรียกดูคำศัพท์ทุกคำในพจนานุกรม CSW24 (2–15 ตัวอักษร) เรียงจาก A พร้อมตัวกรองแบบละเอียด · กด <strong>/</strong> เพื่อโฟกัสช่องค้นหา</p>
 
       <div class="field" style="margin-bottom:0.9rem">
@@ -169,8 +170,8 @@
         <div class="field"><label for="filterScoreMax">คะแนนสูงสุด</label><input type="number" id="filterScoreMax" min="0" placeholder="100"></div>
       </div>
       <div class="btn-row">
-        <button class="btn btn-primary" id="browseSearchBtn">🔍 ค้นหา (Enter)</button>
-        <button class="btn btn-outline btn-sm" id="browseClearBtn">ล้างตัวกรอง</button>
+        <button class="btn btn-primary" id="browseSearchBtn" data-i18n="browse.search">🔍 ค้นหา (Enter)</button>
+        <button class="btn btn-outline btn-sm" id="browseClearBtn" data-i18n="browse.clear">ล้างตัวกรอง</button>
       </div>
       <p class="field-hint" id="browseResultCount"></p>
     </div>
@@ -186,11 +187,11 @@
   <!-- ============== MINIGAME TAB ============== -->
   <section id="tab-minigame" class="tab-panel">
     <div class="panel-card">
-      <h2>🕹️ Minigame</h2>
+      <h2 data-i18n="mini.title">🕹️ Minigame</h2>
       <p class="panel-sub">ฝึกพิมพ์คำศัพท์ให้เร็วและแม่นยำ หรือท้าทายตัวเองหาคำทั้งหมดจาก Rack ตัวอักษร</p>
       <div class="btn-row">
-        <button class="btn btn-primary" id="gameTabTyping">⌨️ พิมพ์ศัพท์ Random</button>
-        <button class="btn btn-outline" id="gameTabRacks">🁢 Random Racks</button>
+        <button class="btn btn-primary" id="gameTabTyping" data-i18n="mini.typing">⌨️ พิมพ์ศัพท์ Random</button>
+        <button class="btn btn-outline" id="gameTabRacks" data-i18n="mini.racks">🁢 Random Racks</button>
       </div>
     </div>
 
@@ -198,15 +199,34 @@
       <h2>⌨️ พิมพ์ศัพท์ Random</h2>
       <p class="panel-sub">พิมพ์คำที่ปรากฏให้ตรงทุกตัวอักษร เปิดโหมดเข้มงวดถ้าอยากให้พิมพ์ผิดแล้วเริ่มรอบใหม่ทันที</p>
       <div id="typingSetup">
+        <div class="field" style="margin-bottom:0.9rem">
+          <label>โหมดเลือกคำ</label>
+          <div class="chip-row">
+            <button type="button" class="mode-chip active" id="tgModeRandomBtn" data-mode="random">🎲 Random</button>
+            <button type="button" class="mode-chip" id="tgModeLetterBtn" data-mode="letter">🔤 พิมพ์ตาม Letter (A→Z)</button>
+          </div>
+        </div>
         <div class="control-row">
           <div class="field"><label for="tgMin">ความยาวต่ำสุด</label><input type="number" id="tgMin" min="2" max="15" value="2"></div>
           <div class="field"><label for="tgMax">ความยาวสูงสุด</label><input type="number" id="tgMax" min="2" max="15" value="4"></div>
           <div class="field"><label for="tgCount">จำนวนคำ</label><input type="number" id="tgCount" min="1" max="100" value="10"></div>
           <label class="checkbox-field"><input type="checkbox" id="tgStrict"> โหมดเข้มงวด (พิมพ์ผิดแล้วเริ่มใหม่)</label>
-          <button class="btn btn-primary" id="tgStartBtn">▶ เริ่มเกม</button>
+          <label class="checkbox-field"><input type="checkbox" id="tgShowAnagramToggle"> 🔤 โชว์ปุ่ม Anagram ระหว่างพิมพ์</label>
+          <button class="btn btn-primary" id="tgStartBtn" data-i18n="mini.startGame">▶ เริ่มเกม</button>
         </div>
       </div>
       <div id="typingPlay" style="display:none"></div>
+      <div class="panel-card" id="tgTypedPanel" style="display:none;margin-top:1rem">
+        <h2 style="font-size:1.05rem">📋 คำที่พิมพ์ไปแล้ว</h2>
+        <div class="quiz-list-head">
+          <label class="checkbox-field"><input type="checkbox" id="tgTypedSelectAll"> เลือกทั้งหมด</label>
+          <span class="selected-count" id="tgTypedSelectedCount">เลือกแล้ว 0 คำ</span>
+        </div>
+        <div id="tgTypedList"></div>
+        <div class="btn-row">
+          <button class="btn btn-teal" id="tgTypedSaveBtn">💾 Save to Cardbox</button>
+        </div>
+      </div>
     </div>
 
     <div class="panel-card" id="racksGamePanel" style="display:none">
@@ -215,7 +235,8 @@
       <div id="racksSetup">
         <div class="control-row">
           <div class="field"><label for="rgSize">ขนาด Rack</label><input type="number" id="rgSize" min="4" max="10" value="7"></div>
-          <button class="btn btn-primary" id="rgStartBtn">▶ สุ่ม Rack ใหม่</button>
+          <label class="checkbox-field"><input type="checkbox" id="rgAllowBlank"> 🁢 มีโอกาสสุ่มได้ Blank</label>
+          <button class="btn btn-primary" id="rgStartBtn" data-i18n="mini.newRack">▶ สุ่ม Rack ใหม่</button>
         </div>
       </div>
       <div id="racksPlay" style="display:none"></div>
@@ -223,35 +244,82 @@
   </section>
 
   <!-- ============== DASHBOARD TAB ============== -->
-  <section id="tab-dashboard" class="tab-panel">
+  <section id="tab-dashboard" class="tab-panel active">
     <div class="panel-card">
-      <h2>Dashboard</h2>
-      <p class="panel-sub">ภาพรวมความคืบหน้าในการเรียนคำศัพท์ของคุณ ข้อมูลทั้งหมดเก็บไว้ในเบราว์เซอร์นี้เท่านั้น</p>
+      <h2 data-i18n="dash.title">Dashboard</h2>
+      <p class="panel-sub" data-i18n="dash.sub">ภาพรวมความคืบหน้าในการเรียนคำศัพท์ของคุณ ข้อมูลทั้งหมดเก็บไว้ในเบราว์เซอร์นี้เท่านั้น</p>
 
       <div class="stat-grid" id="dashStatGrid"></div>
 
       <div class="donut-wrap">
         <div class="donut" id="dashDonut" style="--p:0">
-          <div class="donut-inner"><span class="pct" id="dashPct">0%</span><span class="pct-label">เชี่ยวชาญ</span></div>
+          <div class="donut-inner"><span class="pct" id="dashPct">0%</span><span class="pct-label" data-i18n="dash.mastered">เชี่ยวชาญ</span></div>
         </div>
         <div class="legend" id="dashLegend"></div>
       </div>
 
-      <button class="btn btn-danger btn-sm" id="resetBtn">♻ Reset ความคืบหน้าทั้งหมด</button>
+      <button class="btn btn-danger btn-sm" id="resetBtn" data-i18n="dash.reset">♻ Reset ความคืบหน้าทั้งหมด</button>
     </div>
 
     <div class="panel-card">
-      <h2>นำเข้า / ส่งออกข้อมูล</h2>
-      <p class="panel-sub">สำรองความคืบหน้าไว้เป็นไฟล์ หรือเพิ่มคำศัพท์ของคุณเองเข้าไปใช้งานร่วมกับพจนานุกรม CSW24</p>
+      <h2 data-i18n="dash.suggested">คำแนะนำสำหรับวันนี้</h2>
+      <p class="panel-sub" data-i18n="dash.suggestedSub">สุ่มมาให้ตอนเปิดเว็บ (รีเฉพาะตอนรีเฟรชหน้า) ความยาวตามที่ตั้งไว้ในหน้า Setting</p>
+      <div id="dashSuggestedWords"></div>
       <div class="btn-row">
-        <button class="btn btn-outline btn-sm" id="exportProgressBtn">⬇ ส่งออกความคืบหน้า (JSON)</button>
-        <label class="btn btn-outline btn-sm" for="importProgressInput">⬆ นำเข้าความคืบหน้า (JSON)</label>
+        <button class="btn btn-outline btn-sm" id="dashSuggestedRefreshBtn" data-i18n="dash.suggestedRefresh">🔁 สุ่มใหม่ (ไม่รอ refresh หน้า)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== SETTINGS TAB ============== -->
+  <section id="tab-settings" class="tab-panel">
+    <div class="panel-card">
+      <h2 data-i18n="settings.title">⚙️ Setting</h2>
+      <p class="panel-sub" data-i18n="settings.sub">ตั้งค่าภาษา สีเว็บ และช่วงความยาวคำแนะนำของ Dashboard</p>
+
+      <div class="field" style="margin-bottom:1rem">
+        <label data-i18n="settings.language">ภาษา / Language</label>
+        <div class="chip-row">
+          <button type="button" class="mode-chip" id="langThBtn" data-lang="th">ไทย</button>
+          <button type="button" class="mode-chip" id="langEnBtn" data-lang="en">English</button>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:1rem">
+        <label data-i18n="settings.themePreset">ธีมสี (Preset)</label>
+        <div class="chip-row" id="themePresetChips"></div>
+      </div>
+
+      <div class="control-row" id="themeCustomRow">
+        <div class="field"><label data-i18n="settings.customBoard">สีพื้นบอร์ด</label><input type="color" id="themeColorBoard" class="color-input"></div>
+        <div class="field"><label data-i18n="settings.customBrass">สีเน้น (Brass)</label><input type="color" id="themeColorBrass" class="color-input"></div>
+        <div class="field"><label data-i18n="settings.customTeal">สีเทียบรอง (Teal)</label><input type="color" id="themeColorTeal" class="color-input"></div>
+        <div class="field"><label data-i18n="settings.customCream">สีตัวหนังสือ</label><input type="color" id="themeColorCream" class="color-input"></div>
+        <button class="btn btn-outline btn-sm" id="themeResetBtn" data-i18n="settings.themeReset">↺ คืนค่าเริ่มต้น</button>
+      </div>
+
+      <div class="field" style="margin-top:1.2rem">
+        <label data-i18n="settings.dashRange">ช่วงความยาวคำแนะนำใน Dashboard</label>
+        <div class="control-row">
+          <div class="field"><label for="dashRangeMin" data-i18n="settings.min">ต่ำสุด</label><input type="number" id="dashRangeMin" min="2" max="15" value="5"></div>
+          <div class="field"><label for="dashRangeMax" data-i18n="settings.max">สูงสุด</label><input type="number" id="dashRangeMax" min="2" max="15" value="9"></div>
+          <div class="field"><label for="dashRangeCount" data-i18n="settings.count">จำนวนคำ</label><input type="number" id="dashRangeCount" min="1" max="60" value="12"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <h2 data-i18n="settings.importExport">นำเข้า / ส่งออกข้อมูล</h2>
+      <p class="panel-sub" data-i18n="settings.importExportSub">สำรองความคืบหน้าไว้เป็นไฟล์ หรือเพิ่มคำศัพท์ของคุณเองเข้าไปใช้งานร่วมกับพจนานุกรม CSW24</p>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-sm" id="exportProgressBtn" data-i18n="settings.exportProgress">⬇ ส่งออกความคืบหน้า (JSON)</button>
+        <label class="btn btn-outline btn-sm" for="importProgressInput" data-i18n="settings.importProgress">⬆ นำเข้าความคืบหน้า (JSON)</label>
         <input type="file" id="importProgressInput" accept=".json" class="file-input-hidden">
       </div>
       <div class="btn-row" style="margin-top:0.8rem">
-        <label class="btn btn-outline btn-sm" for="importWordsInput">⬆ นำเข้ารายการคำศัพท์ของฉัน (.txt)</label>
+        <label class="btn btn-outline btn-sm" for="importWordsInput" data-i18n="settings.importWords">⬆ นำเข้ารายการคำศัพท์ของฉัน (.txt)</label>
         <input type="file" id="importWordsInput" accept=".txt" class="file-input-hidden">
-        <label class="checkbox-field"><input type="checkbox" id="includeCustomWords" checked> รวมคำที่นำเข้าเองตอนสุ่ม/ค้นหา</label>
+        <label class="checkbox-field"><input type="checkbox" id="includeCustomWords" checked> <span data-i18n="settings.includeCustom">รวมคำที่นำเข้าเองตอนสุ่ม/ค้นหา</span></label>
       </div>
       <p class="field-hint" id="customWordsCount"></p>
     </div>
@@ -263,7 +331,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="words-data.js"></script>
-<script src="app.js"></script>
+<script src="js/words-data.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
