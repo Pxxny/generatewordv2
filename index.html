@@ -141,6 +141,47 @@
       <div id="cardboxList"></div>
     </div>
 
+    <div class="panel-card">
+      <h2 style="font-size:1.05rem">⏰ ตั้งเวลาครบกำหนดทบทวน (Due time)</h2>
+      <p class="panel-sub" style="margin-bottom:0.7rem">เลือกว่าคำที่เพิ่มเข้า Cardbox ใหม่ควรถึงกำหนดทบทวนเมื่อไหร่ (มีผลกับคำที่เพิ่มจากแท็บแบบทดสอบ / คลังคำศัพท์ / Minigame หลังจากนี้)</p>
+      <div class="field" style="margin-bottom:0.7rem">
+        <div class="chip-row" id="dueTimePresetChips">
+          <button type="button" class="mode-chip" data-due="1h">1 ชม.</button>
+          <button type="button" class="mode-chip" data-due="5h">5 ชม.</button>
+          <button type="button" class="mode-chip" data-due="12h">12 ชม.</button>
+          <button type="button" class="mode-chip active" data-due="24h">24 ชม.</button>
+          <button type="button" class="mode-chip" data-due="1d">1 วัน</button>
+          <button type="button" class="mode-chip" data-due="2d">2 วัน</button>
+          <button type="button" class="mode-chip" data-due="5d">5 วัน</button>
+          <button type="button" class="mode-chip" data-due="10d">10 วัน</button>
+          <button type="button" class="mode-chip" data-due="30d">30 วัน</button>
+          <button type="button" class="mode-chip" data-due="custom">กำหนดเอง</button>
+        </div>
+      </div>
+      <div class="control-row" id="dueTimeCustomRow" style="display:none">
+        <div class="field"><label for="dueTimeCustomValue">จำนวน</label><input type="number" id="dueTimeCustomValue" min="1" value="3"></div>
+        <div class="field">
+          <label for="dueTimeCustomUnit">หน่วย</label>
+          <select id="dueTimeCustomUnit">
+            <option value="h">ชั่วโมง</option>
+            <option value="d" selected>วัน</option>
+          </select>
+        </div>
+      </div>
+      <p class="field-hint">ตอนนี้: คำใหม่จะถึงกำหนดทบทวนใน <strong id="dueTimeSummary">24 ชั่วโมง</strong></p>
+    </div>
+
+    <div class="panel-card">
+      <h2 style="font-size:1.05rem">🗂️ นำเข้า / ส่งออก Cardbox</h2>
+      <p class="panel-sub" style="margin-bottom:0.7rem">เก็บ Cardbox ชุดปัจจุบันไว้เป็นไฟล์ JSON แล้วแทนที่ด้วยชุดใหม่ได้ พออยากกลับมาเรียนชุดเดิมค่อย Import กลับเข้ามา (การ Import จะ<strong>แทนที่ Cardbox ทั้งหมด</strong>ที่มีอยู่)</p>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-sm" id="exportCardboxBtn">⬇ Export Cardbox (JSON)</button>
+        <label class="btn btn-outline btn-sm" for="importCardboxInput">⬆ Import Cardbox (แทนที่ทั้งหมด)</label>
+        <input type="file" id="importCardboxInput" accept=".json" class="file-input-hidden">
+      </div>
+      <p class="field-hint">💡 Import จะลบ Cardbox ปัจจุบันทิ้งก่อน — แนะนำให้ Export เก็บไว้ก่อนเสมอถ้ายังไม่อยากเสียชุดที่กำลังเรียนอยู่</p>
+    </div>
+
     <div class="panel-card" id="studySession">
       <div class="session-progress" id="sessionProgressLabel"></div>
       <div class="session-bar"><div class="session-bar-fill" id="sessionBarFill" style="width:0%"></div></div>
@@ -177,9 +218,21 @@
     </div>
 
     <div class="panel-card">
+      <div class="quiz-list-head">
+        <label class="checkbox-field"><input type="checkbox" id="browseSelectAll"> <span>เลือกทั้งหมด (ที่โหลดแล้ว)</span></label>
+        <span class="selected-count" id="browseSelectedCount">เลือกแล้ว 0 คำ</span>
+      </div>
+      <div class="control-row" style="margin-bottom:0.7rem">
+        <div class="field"><label for="browseRandomCount">สุ่มเลือก</label><input type="number" id="browseRandomCount" min="1" value="10" style="max-width:6rem"></div>
+        <button class="btn btn-outline btn-sm" id="browseSelectRandomBtn" style="align-self:end">🎲 Select Random</button>
+        <button class="btn btn-outline btn-sm" id="browseClearSelectionBtn" style="align-self:end">ล้างการเลือก</button>
+      </div>
       <div id="browseResults"></div>
       <div class="btn-row" id="browseLoadMoreWrap" style="display:none">
         <button class="btn btn-outline" id="browseLoadMoreBtn">โหลดเพิ่ม</button>
+      </div>
+      <div class="btn-row" style="margin-top:0.8rem">
+        <button class="btn btn-teal" id="browseSaveCardboxBtn">💾 Save to Cardbox</button>
       </div>
     </div>
   </section>
@@ -204,15 +257,30 @@
           <div class="chip-row">
             <button type="button" class="mode-chip active" id="tgModeRandomBtn" data-mode="random">🎲 Random</button>
             <button type="button" class="mode-chip" id="tgModeLetterBtn" data-mode="letter">🔤 พิมพ์ตาม Letter (A→Z)</button>
+            <button type="button" class="mode-chip" id="tgModeCardboxBtn" data-mode="cardbox">🗂️ จาก Cardbox</button>
+            <button type="button" class="mode-chip" id="tgModeSuggestedBtn" data-mode="suggested">📊 จาก Dashboard Suggestion</button>
+          </div>
+        </div>
+        <div class="control-row" id="tgRangeRow">
+          <div class="field"><label for="tgMin">ความยาวต่ำสุด</label><input type="number" id="tgMin" min="2" max="15" value="2"></div>
+          <div class="field"><label for="tgMax">ความยาวสูงสุด</label><input type="number" id="tgMax" min="2" max="15" value="4"></div>
+          <div class="field" id="tgCountField"><label for="tgCount">จำนวนคำ</label><input type="number" id="tgCount" min="1" max="100" value="10"></div>
+        </div>
+        <div class="field" id="tgLetterNote" style="display:none;margin-bottom:0.6rem">
+          <span class="panel-sub" style="margin:0">โหมดนี้ใช้ความยาวเดียว และเอาคำ "ทุกคำ" ที่มีความยาวนั้นมาให้พิมพ์ทั้งหมด (ไม่จำกัดจำนวน)</span>
+        </div>
+        <div class="control-row">
+          <label class="checkbox-field"><input type="checkbox" id="tgContainsAllToggle"> 🔎 Contains all (ต้องมีตัวอักษรครบตามที่ระบุ)</label>
+          <div class="field" id="tgContainsAllField" style="display:none">
+            <label for="tgContainsAllInput">ตัวอักษรที่ต้องมี</label>
+            <input type="text" id="tgContainsAllInput" placeholder="เช่น AE" maxlength="12" style="text-transform:uppercase">
           </div>
         </div>
         <div class="control-row">
-          <div class="field"><label for="tgMin">ความยาวต่ำสุด</label><input type="number" id="tgMin" min="2" max="15" value="2"></div>
-          <div class="field"><label for="tgMax">ความยาวสูงสุด</label><input type="number" id="tgMax" min="2" max="15" value="4"></div>
-          <div class="field"><label for="tgCount">จำนวนคำ</label><input type="number" id="tgCount" min="1" max="100" value="10"></div>
           <label class="checkbox-field"><input type="checkbox" id="tgStrict"> โหมดเข้มงวด (พิมพ์ผิดแล้วเริ่มใหม่)</label>
           <label class="checkbox-field"><input type="checkbox" id="tgShowAnagramToggle"> 🔤 โชว์ปุ่ม Anagram ระหว่างพิมพ์</label>
           <button class="btn btn-primary" id="tgStartBtn" data-i18n="mini.startGame">▶ เริ่มเกม</button>
+          <button class="btn btn-outline" id="tgResumeBtn" style="display:none">↩ เล่นต่อจากที่ค้างไว้</button>
         </div>
       </div>
       <div id="typingPlay" style="display:none"></div>
