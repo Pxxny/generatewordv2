@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CSW24 Word Lab — เจนคำศัพท์ & ทบทวนแบบ Flashcard/Anagram</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -29,6 +29,7 @@
   <button class="tab-btn" data-tab="cardbox" data-i18n="tab.cardbox">🗂️ Cardbox</button>
   <button class="tab-btn" data-tab="browse" data-i18n="tab.browse">📖 คลังคำศัพท์</button>
   <button class="tab-btn" data-tab="minigame" data-i18n="tab.minigame">🕹️ Minigame</button>
+  <button class="tab-btn" data-tab="achievements" data-i18n="tab.achievements">🏆 Achievement</button>
   <button class="tab-btn" id="settingsTabBtn" data-tab="settings" data-i18n="tab.settings">⚙️ Setting</button>
 </nav>
 
@@ -262,7 +263,71 @@
       <div class="btn-row">
         <button class="btn btn-primary" id="gameTabTyping" data-i18n="mini.typing">⌨️ พิมพ์ศัพท์ Random</button>
         <button class="btn btn-outline" id="gameTabRacks" data-i18n="mini.racks">🁢 Random Racks</button>
+        <button class="btn btn-outline" id="gameTabAlpha" data-i18n="mini.alpha">🔀 Alphagram Blitz</button>
+        <button class="btn btn-outline" id="gameTabMarathon" data-i18n="mini.marathon">⚡ Time Attack Marathon</button>
       </div>
+    </div>
+
+    <div class="panel-card" id="marathonGamePanel" style="display:none">
+      <h2>⚡ Time Attack Marathon</h2>
+      <p class="panel-sub">ตอบต่อเนื่องหลายรอบแบบจับเวลาสั้นๆ ต่อรอบ — แต่ละรอบจะสลับโจทย์ระหว่าง Anagram / Rack / คำจาก Cardbox แบบสุ่ม ตอบให้ทันเวลาก่อนรอบจะหมดเวลาแล้วข้ามไปรอบถัดไปอัตโนมัติ</p>
+      <div id="marathonSetup">
+        <div class="control-row">
+          <div class="field"><label for="marRoundSeconds">เวลาต่อรอบ (วินาที)</label><input type="number" id="marRoundSeconds" min="5" max="60" value="12"></div>
+          <div class="field"><label for="marRounds">จำนวนรอบทั้งหมด</label><input type="number" id="marRounds" min="5" max="100" value="20"></div>
+        </div>
+        <div class="field" style="margin-bottom:0.6rem">
+          <label>ประเภทโจทย์ที่จะสุ่มมา</label>
+          <div class="control-row">
+            <label class="checkbox-field"><input type="checkbox" id="marTypeAnagram" checked> 🔀 Anagram</label>
+            <label class="checkbox-field"><input type="checkbox" id="marTypeRack" checked> 🁢 Rack</label>
+            <label class="checkbox-field"><input type="checkbox" id="marTypeCardbox" checked> 🗂️ คำจาก Cardbox</label>
+          </div>
+          <span class="field-hint">ถ้า Cardbox ว่างหรือไม่ติ๊กประเภทไหนไว้เลย ระบบจะสลับไปใช้ประเภทที่เหลืออัตโนมัติ</span>
+        </div>
+        <div class="control-row">
+          <div class="field"><label for="marMinLen">ความยาวต่ำสุด</label><input type="number" id="marMinLen" min="3" max="10" value="4"></div>
+          <div class="field"><label for="marMaxLen">ความยาวสูงสุด</label><input type="number" id="marMaxLen" min="3" max="10" value="7"></div>
+        </div>
+        <div class="control-row">
+          <button class="btn btn-primary" id="marStartBtn">▶ เริ่ม Marathon</button>
+        </div>
+      </div>
+      <div id="marathonPlay" style="display:none"></div>
+    </div>
+
+    <div class="panel-card" id="alphaGamePanel" style="display:none">
+      <h2>🔀 Alphagram Blitz</h2>
+      <p class="panel-sub">ไล่ทวนคำศัพท์ยาว 7 ตัวขึ้นไปแบบ Alphagram (ตัวอักษรเรียง A→Z) ทีละชุด — บางชุดมีคำตอบที่ถูกได้มากกว่า 1 คำ ต้องหาให้ครบทุกคำถึงจะผ่านข้อนั้น เลือกจับเวลาแบบ Time Attack หรือเล่นแบบไม่จับเวลาก็ได้</p>
+      <div id="alphaSetup">
+        <div class="field" style="margin-bottom:0.9rem">
+          <label>ความยาวตัวอักษร</label>
+          <div class="chip-row" id="alphaLenChips">
+            <button type="button" class="mode-chip active" data-len="7">7</button>
+            <button type="button" class="mode-chip" data-len="8">8</button>
+            <button type="button" class="mode-chip" data-len="9">9</button>
+            <button type="button" class="mode-chip" data-len="10">10</button>
+          </div>
+        </div>
+        <div class="control-row">
+          <div class="field"><label for="alphaCount">จำนวนชุด (Alphagram)</label><input type="number" id="alphaCount" min="5" max="200" value="20"></div>
+        </div>
+        <div class="field" style="margin-bottom:0.6rem">
+          <label>โหมดเวลา</label>
+          <div class="chip-row">
+            <button type="button" class="mode-chip active" id="alphaModeUntimedBtn" data-timemode="untimed">🧘 ไม่จับเวลา</button>
+            <button type="button" class="mode-chip" id="alphaModeTimeAttackBtn" data-timemode="timeattack">⏱️ Time Attack</button>
+          </div>
+        </div>
+        <div class="control-row" id="alphaTimeAttackRow" style="display:none">
+          <div class="field"><label for="alphaMinutes">เวลา (นาที)</label><input type="number" id="alphaMinutes" min="1" max="60" value="5"></div>
+        </div>
+        <div class="control-row">
+          <label class="checkbox-field"><input type="checkbox" id="alphaShowAnagramToggle"> 🔤 โชว์ปุ่มดูคำใบ้ (Anagram) ระหว่างเล่น</label>
+          <button class="btn btn-primary" id="alphaStartBtn">▶ เริ่มเกม</button>
+        </div>
+      </div>
+      <div id="alphaPlay" style="display:none"></div>
     </div>
 
     <div class="panel-card" id="typingGamePanel">
@@ -356,6 +421,16 @@
     </div>
   </section>
 
+  <!-- ============== ACHIEVEMENTS TAB ============== -->
+  <section id="tab-achievements" class="tab-panel">
+    <div class="panel-card">
+      <h2 data-i18n="ach.title">🏆 Achievement</h2>
+      <p class="panel-sub" data-i18n="ach.sub">ปลดล็อกเหรียญตราจากการเรียนและเล่นมินิเกม ข้อมูลเก็บไว้ในเบราว์เซอร์นี้เท่านั้น</p>
+      <p class="field-hint" id="achievementSummary"></p>
+      <div class="badge-grid" id="achievementGrid"></div>
+    </div>
+  </section>
+
   <!-- ============== SETTINGS TAB ============== -->
   <section id="tab-settings" class="tab-panel">
     <div class="panel-card">
@@ -382,6 +457,21 @@
         <div class="field"><label data-i18n="settings.customCream">สีตัวหนังสือ</label><input type="color" id="themeColorCream" class="color-input"></div>
         <button class="btn btn-outline btn-sm" id="themeResetBtn" data-i18n="settings.themeReset">↺ คืนค่าเริ่มต้น</button>
       </div>
+
+      <div class="field" style="margin-top:1.2rem">
+        <label>ตัวอักษร (Font)</label>
+        <div class="chip-row" id="fontFamilyChips"></div>
+      </div>
+      <div class="field" style="margin-top:0.7rem">
+        <label>ขนาดตัวอักษร (Font size)</label>
+        <div class="chip-row" id="fontSizeChips">
+          <button type="button" class="mode-chip" data-size="0.9">เล็ก</button>
+          <button type="button" class="mode-chip active" data-size="1">ปกติ</button>
+          <button type="button" class="mode-chip" data-size="1.15">ใหญ่</button>
+          <button type="button" class="mode-chip" data-size="1.3">ใหญ่มาก</button>
+        </div>
+      </div>
+      <p class="field-hint" style="margin-top:0.5rem">ตัวอย่าง: <span id="fontPreviewText" style="font-size:1.1em">คำศัพท์ CSW24 ABCDEFG 0123456789</span></p>
 
       <div class="field" style="margin-top:1.2rem">
         <label data-i18n="settings.dashRange">ช่วงความยาวคำแนะนำใน Dashboard</label>
@@ -417,6 +507,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="js/words-data.js"></script>
+<script src="js/badges.js"></script>
+<script src="js/achievement.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
