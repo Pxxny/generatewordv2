@@ -29,7 +29,7 @@
 
 * { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; font-size: calc(16px * var(--font-scale, 1)); }
 
 body {
   margin: 0;
@@ -408,6 +408,8 @@ main {
 .session-progress { font-family: var(--font-mono); font-size: 0.82rem; color: #8fae9f; margin-bottom: 0.9rem; }
 .session-bar { height: 5px; background: var(--board-2); border-radius: 4px; overflow: hidden; margin-bottom: 1.3rem; }
 .session-bar-fill { height: 100%; background: var(--brass); transition: width .25s ease; }
+.marathon-round-bar { transition: width .1s linear; }
+.marathon-round-bar.marathon-bar-urgent { background: #d64545; }
 
 .session-card {
   background: var(--board-2);
@@ -511,6 +513,89 @@ main {
   text-align: center;
 }
 #toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ---------- achievement toast ---------- */
+
+#achievementToast {
+  position: fixed;
+  top: 1.1rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(-140%) scale(0.9);
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: linear-gradient(135deg, var(--board-2), var(--board-1));
+  border: 1px solid var(--brass);
+  color: var(--cream);
+  padding: 0.7rem 1.2rem 0.7rem 0.8rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 0 1px rgba(209,165,61,0.15);
+  z-index: 200;
+  max-width: 92vw;
+  transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .3s ease;
+  pointer-events: none;
+}
+#achievementToast.ach-toast-show {
+  transform: translateX(-50%) translateY(0) scale(1);
+  opacity: 1;
+  animation: achPulse 2.6s ease-in-out;
+}
+@keyframes achPulse {
+  0% { box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 0 0 rgba(209,165,61,0.55); }
+  15% { box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 0 10px rgba(209,165,61,0); }
+  100% { box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 0 0 rgba(209,165,61,0); }
+}
+.ach-toast-icon {
+  font-size: 1.9rem;
+  line-height: 1;
+  animation: achIconBounce .6s ease;
+}
+@keyframes achIconBounce {
+  0% { transform: scale(0.3) rotate(-15deg); }
+  55% { transform: scale(1.25) rotate(8deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.ach-toast-kicker {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brass);
+  font-weight: 700;
+}
+.ach-toast-name {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  margin-top: 0.1rem;
+}
+
+/* ---------- achievement badges tab ---------- */
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.8rem;
+}
+.badge-card {
+  background: var(--board-1);
+  border: 1px solid var(--rail);
+  border-radius: 12px;
+  padding: 0.9rem 0.7rem;
+  text-align: center;
+  transition: transform .15s ease, border-color .15s ease;
+}
+.badge-card.badge-unlocked {
+  border-color: var(--brass-deep);
+  background: linear-gradient(160deg, var(--board-2), var(--board-1));
+}
+.badge-card.badge-unlocked:hover { transform: translateY(-2px); border-color: var(--brass); }
+.badge-card.badge-locked { opacity: 0.55; }
+.badge-icon { font-size: 1.9rem; margin-bottom: 0.3rem; }
+.badge-name { font-family: var(--font-display); font-size: 0.92rem; color: var(--cream); }
+.badge-desc { font-size: 0.72rem; color: #8fae9f; margin-top: 0.25rem; line-height: 1.35; }
+.badge-card.badge-unlocked .badge-desc { color: #b8ceC0; }
+.badge-date { font-size: 0.65rem; color: var(--brass); margin-top: 0.4rem; }
 
 /* ---------- misc ---------- */
 
