@@ -27,7 +27,8 @@
     th: {
       'tab.dashboard': '📊 Dashboard', 'tab.generate': '📝 สร้างคำศัพท์', 'tab.quiz': '🎯 แบบทดสอบ',
       'tab.cardbox': '🗂️ Cardbox', 'tab.browse': '📖 คลังคำศัพท์', 'tab.minigame': '🕹️ Minigame',
-      'tab.settings': '⚙️ Setting',
+      'tab.achievements': '🏆 Achievement', 'tab.settings': '⚙️ Setting',
+      'ach.title': '🏆 Achievement', 'ach.sub': 'ปลดล็อกเหรียญตราจากการเรียนและเล่นมินิเกม ข้อมูลเก็บไว้ในเบราว์เซอร์นี้เท่านั้น',
       'app.title': 'CSW24 Word Lab',
       'app.subtitle': 'เจนคำศัพท์ · หา Anagram · เก็บลง Cardbox · ทบทวนแบบ Spaced Repetition · Minigame',
       'gen.title': 'สร้างรายการคำศัพท์',
@@ -40,6 +41,7 @@
       'cardbox.anagramOrder': 'การเรียงตัวอักษร', 'cardbox.studyCount': 'จำนวนคำที่ทบทวน', 'cardbox.start': '▶ เริ่มทบทวน',
       'browse.title': 'คลังคำศัพท์ทั้งหมด', 'browse.search': '🔍 ค้นหา (Enter)', 'browse.clear': 'ล้างตัวกรอง',
       'mini.title': '🕹️ Minigame', 'mini.typing': '⌨️ พิมพ์ศัพท์ Random', 'mini.racks': '🁢 Random Racks',
+      'mini.alpha': '🔀 Alphagram Blitz', 'mini.marathon': '⚡ Time Attack Marathon',
       'mini.startGame': '▶ เริ่มเกม', 'mini.newRack': '▶ สุ่ม Rack ใหม่',
       'dash.title': 'Dashboard', 'dash.sub': 'ภาพรวมความคืบหน้าในการเรียนคำศัพท์ของคุณ ข้อมูลทั้งหมดเก็บไว้ในเบราว์เซอร์นี้เท่านั้น',
       'dash.mastered': 'เชี่ยวชาญ', 'dash.reset': '♻ Reset ความคืบหน้าทั้งหมด',
@@ -59,7 +61,8 @@
     en: {
       'tab.dashboard': '📊 Dashboard', 'tab.generate': '📝 Generate', 'tab.quiz': '🎯 Quiz',
       'tab.cardbox': '🗂️ Cardbox', 'tab.browse': '📖 Word Browser', 'tab.minigame': '🕹️ Minigame',
-      'tab.settings': '⚙️ Settings',
+      'tab.achievements': '🏆 Achievements', 'tab.settings': '⚙️ Settings',
+      'ach.title': '🏆 Achievements', 'ach.sub': 'Unlock badges by studying and playing minigames. All data is stored in this browser only.',
       'app.title': 'CSW24 Word Lab',
       'app.subtitle': 'Generate words · Find Anagrams · Save to Cardbox · Spaced Repetition review · Minigames',
       'gen.title': 'Generate word list',
@@ -72,6 +75,7 @@
       'cardbox.anagramOrder': 'Letter order', 'cardbox.studyCount': 'Words to review', 'cardbox.start': '▶ Start review',
       'browse.title': 'Full word dictionary', 'browse.search': '🔍 Search (Enter)', 'browse.clear': 'Clear filters',
       'mini.title': '🕹️ Minigame', 'mini.typing': '⌨️ Random Word Typing', 'mini.racks': '🁢 Random Racks',
+      'mini.alpha': '🔀 Alphagram Blitz', 'mini.marathon': '⚡ Time Attack Marathon',
       'mini.startGame': '▶ Start game', 'mini.newRack': '▶ New rack',
       'dash.title': 'Dashboard', 'dash.sub': 'Overview of your word-learning progress. All data is stored in this browser only.',
       'dash.mastered': 'Mastered', 'dash.reset': '♻ Reset all progress',
@@ -104,7 +108,8 @@
     customColors: null, // {board,brass,teal,cream} or null
     dashMin: 5, dashMax: 9, dashCount: 12,
     dueTimePreset: '24h', // 1h,5h,12h,24h,1d,2d,5d,10d,30d,custom
-    dueTimeCustomValue: 3, dueTimeCustomUnit: 'd'
+    dueTimeCustomValue: 3, dueTimeCustomUnit: 'd',
+    fontFamily: 'inter', fontScale: 1
   };
 
   function loadSettings() {
@@ -128,6 +133,21 @@
     document.querySelectorAll('[data-i18n]').forEach(function (el) {
       el.textContent = t(el.dataset.i18n);
     });
+  }
+
+  const FONT_OPTIONS = [
+    { id: 'inter', label: 'Inter (ค่าเริ่มต้น)', body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" },
+    { id: 'atkinson', label: 'Atkinson Hyperlegible (อ่านง่าย)', body: "'Atkinson Hyperlegible', -apple-system, sans-serif" },
+    { id: 'lexend', label: 'Lexend (อ่านง่าย)', body: "'Lexend', -apple-system, sans-serif" },
+    { id: 'sarabun', label: 'Sarabun (ไทย)', body: "'Sarabun', -apple-system, sans-serif" },
+    { id: 'system', label: 'ตัวอักษรระบบ (System)', body: "system-ui, -apple-system, Segoe UI, sans-serif" }
+  ];
+
+  function applyFontSettings() {
+    const root = document.documentElement.style;
+    const opt = FONT_OPTIONS.find(function (o) { return o.id === settings.fontFamily; }) || FONT_OPTIONS[0];
+    root.setProperty('--font-body', opt.body);
+    root.setProperty('--font-scale', settings.fontScale || 1);
   }
 
   function applyTheme() {
@@ -252,6 +272,42 @@
       applyTheme();
       refreshPresetChips();
       syncColorInputsToCurrentTheme();
+    });
+
+    // font family + size
+    const fontFamilyWrap = document.getElementById('fontFamilyChips');
+    fontFamilyWrap.innerHTML = FONT_OPTIONS.map(function (o) {
+      return '<button type="button" class="mode-chip" data-font="' + o.id + '">' + o.label + '</button>';
+    }).join('');
+    function refreshFontFamilyChips() {
+      fontFamilyWrap.querySelectorAll('.mode-chip').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.font === settings.fontFamily);
+      });
+    }
+    refreshFontFamilyChips();
+    fontFamilyWrap.querySelectorAll('.mode-chip').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        settings.fontFamily = btn.dataset.font;
+        saveSettings();
+        applyFontSettings();
+        refreshFontFamilyChips();
+      });
+    });
+
+    const fontSizeWrap = document.getElementById('fontSizeChips');
+    function refreshFontSizeChips() {
+      fontSizeWrap.querySelectorAll('.mode-chip').forEach(function (btn) {
+        btn.classList.toggle('active', parseFloat(btn.dataset.size) === settings.fontScale);
+      });
+    }
+    refreshFontSizeChips();
+    fontSizeWrap.querySelectorAll('.mode-chip').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        settings.fontScale = parseFloat(btn.dataset.size);
+        saveSettings();
+        applyFontSettings();
+        refreshFontSizeChips();
+      });
     });
 
     // dashboard suggested-word range settings
@@ -459,6 +515,7 @@
         }
         detail.classList.add('open');
         btn.textContent = '🔤 ซ่อน Anagram';
+        if (window.Achievements) window.Achievements.record('anagram_view');
       });
     });
   }
@@ -543,7 +600,7 @@
   }
 
   // simplified SM-2 style spaced repetition
-  function updateCardResult(word, isCorrect) {
+  function updateCardResult(word, isCorrect, hintUsed) {
     const box = loadCardbox();
     const card = box.find(function (c) { return c.word === word; });
     if (!card) return;
@@ -557,7 +614,11 @@
       else if (card.reps === 1) card.interval = 3;
       else card.interval = Math.max(1, Math.round(card.interval * card.ease));
       card.reps++;
-      card.ease = Math.min(3.2, card.ease + 0.1);
+      // A correct answer reached with a hint means the word wasn't fully
+      // recalled unaided, so it gets a smaller ease boost (and slightly
+      // shorter next interval) than a clean, unhinted recall.
+      card.ease = Math.min(3.2, card.ease + (hintUsed ? 0.03 : 0.1));
+      if (hintUsed) card.interval = Math.max(1, Math.round(card.interval * 0.6));
     } else {
       card.reps = 0;
       card.interval = 1;
@@ -595,6 +656,7 @@
         if (btn.dataset.tab === 'cardbox') renderCardboxTab();
         if (btn.dataset.tab === 'dashboard') renderDashboard();
         if (btn.dataset.tab === 'settings') { renderDashboard(); }
+        if (btn.dataset.tab === 'achievements' && window.Achievements) window.Achievements.renderTab();
         if (btn.dataset.tab === 'browse' && !browseInitialized) {
           browseInitialized = true;
           initBrowseChips();
@@ -758,6 +820,7 @@
       if (!quizState.selected.size) { showToast('กรุณาเลือกคำศัพท์อย่างน้อย 1 คำ'); return; }
       const added = addWordsToCardbox(Array.from(quizState.selected));
       showToast('บันทึกลง Cardbox แล้ว ' + added + ' คำ');
+      if (window.Achievements) window.Achievements.record('cardbox_add');
     });
   }
 
@@ -906,7 +969,7 @@
 
   // ---------- Study session ----------
 
-  const session = { queue: [], index: 0, mode: 'flashcard', anagramOrder: 'alpha', correct: 0, incorrect: 0, flipped: false };
+  const session = { queue: [], index: 0, mode: 'flashcard', anagramOrder: 'alpha', correct: 0, incorrect: 0, flipped: false, hintLevel: 0, hintUsed: false };
 
   function sessionKeyHandler(e) {
     if (e.key === 'Escape') {
@@ -942,6 +1005,8 @@
     session.anagramOrder = anagramOrder;
     session.correct = 0;
     session.incorrect = 0;
+    session.hintLevel = 0;
+    session.hintUsed = false;
     document.getElementById('cardboxSetup').style.display = 'none';
     document.getElementById('cardboxList').style.display = 'none';
     document.getElementById('studySession').classList.add('open');
@@ -967,14 +1032,16 @@
     document.getElementById('sessionBarFill').style.width = pct + '%';
   }
 
-  function recordAnswer(word, isCorrect) {
-    updateCardResult(word, isCorrect);
+  function recordAnswer(word, isCorrect, hintUsed) {
+    updateCardResult(word, isCorrect, hintUsed);
     if (isCorrect) session.correct++; else session.incorrect++;
   }
 
   function nextCard() {
     session.index++;
     session.flipped = false;
+    session.hintLevel = 0;
+    session.hintUsed = false;
     renderSessionCard();
   }
 
@@ -991,6 +1058,11 @@
           '<div class="session-controls"><button class="btn btn-primary" id="sessionFinishBtn">เสร็จสิ้น</button></div>' +
         '</div>';
       document.getElementById('sessionFinishBtn').addEventListener('click', endStudySession);
+      if (window.Achievements) {
+        window.Achievements.record('session_complete', {
+          total: session.queue.length, correct: session.correct, incorrect: session.incorrect
+        });
+      }
       return;
     }
 
@@ -1034,6 +1106,7 @@
 
   function renderAnagramCard(area, word) {
     const letters = session.anagramOrder === 'alpha' ? sortLetters(word) : shuffle(word.split('')).join('');
+    session.hintLevel = 0;
     area.innerHTML =
       '<div class="session-card">' +
         '<div class="session-prompt-label">Anagram · เรียงตัวอักษรให้เป็นคำศัพท์</div>' +
@@ -1042,6 +1115,10 @@
           '<input type="text" id="anagramInput" autocomplete="off" placeholder="พิมพ์คำตอบแล้วกด Enter" autofocus>' +
           '<button class="btn btn-primary" type="submit">ตรวจคำตอบ</button>' +
         '</form>' +
+        '<div class="session-controls">' +
+          '<button type="button" class="btn btn-outline btn-sm" id="anagramHintBtn">💡 Hint</button>' +
+        '</div>' +
+        '<div class="field-hint" id="anagramHintText"></div>' +
         '<div class="session-feedback" id="anagramFeedback"></div>' +
         '<div class="session-controls" id="anagramNextWrap" style="display:none">' +
           '<button class="btn btn-teal" id="anagramNextBtn">ต่อไป (Enter) →</button>' +
@@ -1050,6 +1127,29 @@
 
     const form = document.getElementById('anagramForm');
     const feedback = document.getElementById('anagramFeedback');
+    const hintBtn = document.getElementById('anagramHintBtn');
+    const hintText = document.getElementById('anagramHintText');
+
+    hintBtn.addEventListener('click', function () {
+      // Reveal one more letter each click, up to word.length - 1 so the
+      // final letter is never handed over for free. Also nudge the ease
+      // factor down slightly so hinted cards resurface a bit sooner —
+      // using a hint means the word wasn't fully recalled unaided.
+      const maxHint = Math.max(1, word.length - 1);
+      if (session.hintLevel < maxHint) {
+        session.hintLevel++;
+        session.hintUsed = true;
+      }
+      const revealed = word.slice(0, session.hintLevel).split('').join(' ');
+      const blanks = word.length - session.hintLevel;
+      hintText.textContent = '💡 ' + revealed + (blanks > 0 ? '  ' + '_ '.repeat(blanks).trim() : '') +
+        ' (' + session.hintLevel + '/' + word.length + ' ตัวอักษร)';
+      if (session.hintLevel >= maxHint) {
+        hintBtn.disabled = true;
+        hintBtn.textContent = '💡 Hint (สูงสุดแล้ว)';
+      }
+    });
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       const input = document.getElementById('anagramInput');
@@ -1062,16 +1162,18 @@
       const isCorrect = validGroup.indexOf(guess) !== -1;
 
       input.disabled = true;
+      hintBtn.disabled = true;
       form.querySelector('button').disabled = true;
       if (isCorrect) {
         feedback.textContent = '✓ ถูกต้อง! ' + guess +
+          (session.hintUsed ? '  (ใช้ Hint ช่วย)' : '') +
           (validGroup.length > 1 ? '  (คำอื่นที่เป็นไปได้เช่นกัน: ' + validGroup.filter(function (w) { return w !== guess; }).join(', ') + ')' : '');
         feedback.className = 'session-feedback correct';
       } else {
         feedback.textContent = '✗ ยังไม่ถูก — คำตอบที่เป็นไปได้: ' + validGroup.join(', ');
         feedback.className = 'session-feedback wrong';
       }
-      recordAnswer(word, isCorrect);
+      recordAnswer(word, isCorrect, session.hintUsed);
       document.getElementById('anagramNextWrap').style.display = '';
       document.getElementById('anagramNextBtn').addEventListener('click', nextCard);
     });
@@ -1778,6 +1880,7 @@
     });
     tgRenderTypedPanel();
     tgRefreshResumeBtn();
+    if (window.Achievements) window.Achievements.record('typing_win');
   }
 
   // ---------- Minigame typing: "typed words so far" review + save panel ----------
@@ -1829,6 +1932,7 @@
       if (!tg.typedSelected.size) { showToast('กรุณาเลือกคำศัพท์อย่างน้อย 1 คำ'); return; }
       const added = addWordsToCardbox(Array.from(tg.typedSelected));
       showToast('บันทึกลง Cardbox แล้ว ' + added + ' คำ');
+      if (window.Achievements) window.Achievements.record('cardbox_add');
     });
   }
 
@@ -1938,6 +2042,7 @@
           rg.found.add(guess);
           rg.score += wordScore(guess);
           showToast('✓ ถูกต้อง! +' + wordScore(guess) + ' คะแนน');
+          if (window.Achievements) window.Achievements.record('racks_correct');
           rgRenderPlay();
           const freshInput = document.getElementById('rgInput');
           if (freshInput) freshInput.focus();
@@ -1961,23 +2066,502 @@
     }
   }
 
+  // ---------- Minigame: Alphagram Blitz ----------
+
+  const alpha = {
+    len: 7, items: [], index: 0, found: [], score: 0,
+    timeAttack: false, minutes: 5, deadline: 0, timerHandle: null,
+    showAnagram: false, finished: false, startTime: 0
+  };
+
+  // Groups every word of a given length by its sorted-letter alphagram key,
+  // so each "clue" may have one or several valid solutions (like the reference screenshot).
+  function alphaBuildGroups(L, count) {
+    const pool = lengthPool(L);
+    const byKey = {};
+    for (let i = 0; i < pool.length; i++) {
+      const w = pool[i];
+      const key = sortLetters(w);
+      (byKey[key] = byKey[key] || []).push(w);
+    }
+    const keys = shuffle(Object.keys(byKey));
+    const chosen = keys.slice(0, Math.min(count, keys.length));
+    return chosen.map(function (key) {
+      return { key: key, solutions: byKey[key].slice().sort(), found: new Set() };
+    });
+  }
+
+  function alphaStart() {
+    const count = Math.max(5, Math.min(parseInt(document.getElementById('alphaCount').value, 10) || 20, 200));
+    alpha.len = alpha.len || 7;
+    alpha.items = alphaBuildGroups(alpha.len, count);
+    if (!alpha.items.length) { showToast('ไม่พบคำศัพท์ความยาวนี้'); return; }
+    alpha.index = 0;
+    alpha.found = [];
+    alpha.score = 0;
+    alpha.finished = false;
+    alpha.showAnagram = document.getElementById('alphaShowAnagramToggle').checked;
+    alpha.startTime = Date.now();
+
+    if (alpha.timeAttack) {
+      alpha.minutes = Math.max(1, Math.min(parseInt(document.getElementById('alphaMinutes').value, 10) || 5, 60));
+      alpha.deadline = Date.now() + alpha.minutes * 60000;
+      if (alpha.timerHandle) clearInterval(alpha.timerHandle);
+      alpha.timerHandle = setInterval(alphaTickTimer, 250);
+    } else if (alpha.timerHandle) {
+      clearInterval(alpha.timerHandle);
+      alpha.timerHandle = null;
+    }
+
+    document.getElementById('alphaPlay').style.display = '';
+    alphaRenderPlay();
+  }
+
+  function alphaFormatTime(ms) {
+    if (ms < 0) ms = 0;
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  function alphaTickTimer() {
+    const remaining = alpha.deadline - Date.now();
+    const label = document.getElementById('alphaTimeLeft');
+    if (label) label.textContent = alphaFormatTime(remaining);
+    if (remaining <= 0 && !alpha.finished) {
+      alphaFinish();
+    }
+  }
+
+  function alphaCurrentItem() {
+    return alpha.items[alpha.index];
+  }
+
+  function alphaRenderPlay() {
+    const area = document.getElementById('alphaPlay');
+    if (alpha.finished) { alphaRenderSummary(area); return; }
+
+    const item = alphaCurrentItem();
+    if (!item) { alphaFinish(); return; }
+
+    const totalDone = alpha.index;
+    const progressLabel = 'ชุดที่ ' + (alpha.index + 1) + ' / ' + alpha.items.length +
+      ' · เจอแล้ว ' + item.found.size + ' / ' + item.solutions.length + ' คำในชุดนี้' +
+      ' · คะแนนรวม ' + alpha.score +
+      (alpha.timeAttack ? ' · ⏱️ <span id="alphaTimeLeft">' + alphaFormatTime(alpha.deadline - Date.now()) + '</span>' : '');
+
+    area.innerHTML =
+      '<div class="session-progress">' + progressLabel + '</div>' +
+      '<div class="session-bar"><div class="session-bar-fill" id="alphaBarFill" style="width:' +
+        Math.round((totalDone / alpha.items.length) * 100) + '%"></div></div>' +
+      '<div class="session-card">' +
+        '<div class="session-prompt-label">เรียงตัวอักษรใหม่ให้เป็นคำศัพท์' +
+          (item.solutions.length > 1 ? ' (มีคำตอบได้ ' + item.solutions.length + ' คำ — หาให้ครบ)' : '') + '</div>' +
+        tileRowHTML(item.key, 'big') +
+        '<form class="session-answer-form" id="alphaForm">' +
+          '<input type="text" id="alphaInput" autocomplete="off" placeholder="พิมพ์คำแล้วกด Enter" autofocus>' +
+          '<button class="btn btn-primary" type="submit">ส่งคำตอบ</button>' +
+        '</form>' +
+        (item.found.size ? '<div class="anagram-partners">' + Array.from(item.found).sort().map(function (w) {
+          return '<span class="anagram-chip">' + w + '</span>';
+        }).join('') + '</div>' : '') +
+        '<div class="session-controls">' +
+          (alpha.showAnagram ? '<button class="btn btn-outline" id="alphaHintBtn">🔤 ดูคำใบ้</button>' : '') +
+          '<button class="btn btn-outline" id="alphaSkipBtn">⏭ ข้ามชุดนี้</button>' +
+          '<button class="btn btn-danger btn-sm" id="alphaEndBtn">⏹ จบเกม</button>' +
+        '</div>' +
+      '</div>';
+
+    const form = document.getElementById('alphaForm');
+    const input = document.getElementById('alphaInput');
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const guess = input.value.trim().toUpperCase();
+      input.value = '';
+      input.focus();
+      if (!guess) return;
+      const cur = alphaCurrentItem();
+      if (!cur) return;
+      if (cur.found.has(guess)) { showToast('เจอคำนี้ไปแล้ว'); return; }
+      if (cur.solutions.indexOf(guess) !== -1) {
+        cur.found.add(guess);
+        alpha.score += wordScore(guess);
+        alpha.found.push(guess);
+        if (cur.found.size >= cur.solutions.length) {
+          showToast('✓ ครบทุกคำในชุดนี้! +' + wordScore(guess) + ' คะแนน');
+          alpha.index++;
+          if (window.Achievements) window.Achievements.record('alpha_cleared');
+        } else {
+          showToast('✓ ถูกต้อง! +' + wordScore(guess) + ' คะแนน (ยังเหลืออีก ' + (cur.solutions.length - cur.found.size) + ' คำ)');
+        }
+        alphaRenderPlay();
+      } else {
+        showToast('✗ ไม่ใช่คำตอบของชุดนี้');
+      }
+    });
+
+    const hintBtn = document.getElementById('alphaHintBtn');
+    if (hintBtn) {
+      hintBtn.addEventListener('click', function () {
+        const cur = alphaCurrentItem();
+        const remaining = cur.solutions.filter(function (w) { return !cur.found.has(w); });
+        showToast('เหลือ ' + remaining.length + ' คำ · ตัวแรก: ' + remaining.map(function (w) { return w[0]; }).join(', '));
+      });
+    }
+
+    document.getElementById('alphaSkipBtn').addEventListener('click', function () {
+      alpha.index++;
+      alphaRenderPlay();
+    });
+
+    document.getElementById('alphaEndBtn').addEventListener('click', alphaFinish);
+  }
+
+  function alphaFinish() {
+    alpha.finished = true;
+    if (alpha.timerHandle) { clearInterval(alpha.timerHandle); alpha.timerHandle = null; }
+    alphaRenderPlay();
+  }
+
+  function alphaRenderSummary(area) {
+    const totalSolutions = alpha.items.reduce(function (sum, it) { return sum + it.solutions.length; }, 0);
+    const totalItemsCleared = alpha.items.filter(function (it) { return it.found.size >= it.solutions.length; }).length;
+    const elapsedMs = Date.now() - alpha.startTime;
+    const missed = [];
+    alpha.items.forEach(function (it) {
+      it.solutions.forEach(function (w) {
+        if (!it.found.has(w)) missed.push(w);
+      });
+    });
+
+    area.innerHTML =
+      '<div class="session-summary">' +
+        '<div class="big-stat">' + alpha.score + '</div>' +
+        '<div class="field-hint" style="margin-bottom:1rem">คะแนนรวม · เจอ ' + alpha.found.length + ' / ' + totalSolutions +
+          ' คำ · ผ่านครบ ' + totalItemsCleared + ' / ' + alpha.items.length + ' ชุด · ใช้เวลา ' + alphaFormatTime(elapsedMs) + '</div>' +
+        (missed.length ? '<p class="panel-sub" style="margin-bottom:0.5rem">คำที่พลาด:</p><div class="anagram-partners">' +
+          missed.sort().map(function (w) { return '<span class="anagram-chip missed">' + w + '</span>'; }).join('') + '</div>' : '') +
+        '<div class="session-controls" style="margin-top:1.2rem">' +
+          '<button class="btn btn-primary" id="alphaPlayAgainBtn">🔁 เล่นอีกรอบ</button>' +
+          (alpha.found.length ? '<button class="btn btn-teal" id="alphaSaveFoundBtn">💾 Save คำที่เจอลง Cardbox</button>' : '') +
+        '</div>' +
+      '</div>';
+
+    document.getElementById('alphaPlayAgainBtn').addEventListener('click', function () {
+      document.getElementById('alphaSetup').style.display = '';
+      document.getElementById('alphaPlay').style.display = 'none';
+    });
+    const saveBtn = document.getElementById('alphaSaveFoundBtn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', function () {
+        const uniqueWords = Array.from(new Set(alpha.found));
+        const added = addWordsToCardbox(uniqueWords);
+        showToast('เพิ่มลง Cardbox แล้ว ' + added + ' คำ');
+        if (window.Achievements) window.Achievements.record('cardbox_add');
+      });
+    }
+  }
+
+  function initAlphaGame() {
+    const lenWrap = document.getElementById('alphaLenChips');
+    lenWrap.querySelectorAll('.mode-chip').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        lenWrap.querySelectorAll('.mode-chip').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        alpha.len = parseInt(btn.dataset.len, 10);
+      });
+    });
+
+    const untimedBtn = document.getElementById('alphaModeUntimedBtn');
+    const timeAttackBtn = document.getElementById('alphaModeTimeAttackBtn');
+    const timeAttackRow = document.getElementById('alphaTimeAttackRow');
+    untimedBtn.addEventListener('click', function () {
+      alpha.timeAttack = false;
+      untimedBtn.classList.add('active'); timeAttackBtn.classList.remove('active');
+      timeAttackRow.style.display = 'none';
+    });
+    timeAttackBtn.addEventListener('click', function () {
+      alpha.timeAttack = true;
+      timeAttackBtn.classList.add('active'); untimedBtn.classList.remove('active');
+      timeAttackRow.style.display = '';
+    });
+
+    document.getElementById('alphaStartBtn').addEventListener('click', function () {
+      document.getElementById('alphaSetup').style.display = 'none';
+      alphaStart();
+    });
+  }
+
+  // ---------- Minigame: Time Attack Marathon ----------
+  // Continuous short rounds; each round randomly picks a puzzle type
+  // (Anagram / Rack / Cardbox word) and gives a tight time budget to answer.
+
+  const RACK_LETTER_BAG = 'AAAAAAAAABBCCDDDDEEEEEEEEEEEEFFGGGHHIIIIIIIIIJKLLLLMMNNNNNNOOOOOOOOPPQRRRRRRSSSSTTTTTTUUUUVVWWXYYZ';
+
+  const mar = {
+    rounds: 20, roundSeconds: 12, minLen: 4, maxLen: 7,
+    types: [], round: 0, correct: 0, incorrect: 0, skipped: 0,
+    score: 0, streak: 0, bestStreak: 0,
+    current: null, deadline: 0, timerHandle: null, finished: false, startTime: 0
+  };
+
+  function marEnabledTypes() {
+    const types = [];
+    if (document.getElementById('marTypeAnagram').checked) types.push('anagram');
+    if (document.getElementById('marTypeRack').checked) types.push('rack');
+    if (document.getElementById('marTypeCardbox').checked && loadCardbox().length) types.push('cardbox');
+    if (!types.length) return ['anagram', 'rack']; // fallback if nothing usable is selected
+    return types;
+  }
+
+  function marRandomLen() {
+    const min = mar.minLen, max = mar.maxLen;
+    return min + Math.floor(Math.random() * (max - min + 1));
+  }
+
+  function marBuildAnagramRound() {
+    const len = marRandomLen();
+    const pool = lengthPool(len);
+    if (!pool.length) return null;
+    const word = pool[Math.floor(Math.random() * pool.length)];
+    const key = sortLetters(word);
+    const accepted = new Set();
+    for (let i = 0; i < pool.length; i++) {
+      if (sortLetters(pool[i]) === key) accepted.add(pool[i]);
+    }
+    return { type: 'anagram', display: key, accepted: accepted, revealWord: word };
+  }
+
+  function marBuildRackRound() {
+    const size = Math.max(4, Math.min(mar.maxLen, 7));
+    const letters = [];
+    for (let i = 0; i < size; i++) letters.push(RACK_LETTER_BAG[Math.floor(Math.random() * RACK_LETTER_BAG.length)]);
+    const rackCounts = letterCounts(letters.join(''));
+    const accepted = new Set();
+    for (let L = 2; L <= size; L++) {
+      const pool = lengthPool(L);
+      for (let i = 0; i < pool.length; i++) {
+        if (isSubsetOfCounts(pool[i], rackCounts)) accepted.add(pool[i]);
+      }
+    }
+    if (!accepted.size) return null;
+    return { type: 'rack', display: letters.join(''), accepted: accepted, revealWord: Array.from(accepted).sort()[0] };
+  }
+
+  function marBuildCardboxRound() {
+    const box = loadCardbox();
+    if (!box.length) return null;
+    const card = box[Math.floor(Math.random() * box.length)];
+    const word = card.word;
+    return { type: 'cardbox', display: sortLetters(word), accepted: new Set([word]), revealWord: word };
+  }
+
+  function marBuildRound() {
+    const available = mar.types.slice();
+    let guard = 0;
+    while (available.length && guard < 6) {
+      guard++;
+      const pick = available[Math.floor(Math.random() * available.length)];
+      let round = null;
+      if (pick === 'anagram') round = marBuildAnagramRound();
+      else if (pick === 'rack') round = marBuildRackRound();
+      else if (pick === 'cardbox') round = marBuildCardboxRound();
+      if (round) return round;
+      available.splice(available.indexOf(pick), 1);
+    }
+    return null;
+  }
+
+  function marStart() {
+    mar.roundSeconds = Math.max(5, Math.min(parseInt(document.getElementById('marRoundSeconds').value, 10) || 12, 60));
+    mar.rounds = Math.max(5, Math.min(parseInt(document.getElementById('marRounds').value, 10) || 20, 100));
+    mar.minLen = Math.max(3, Math.min(parseInt(document.getElementById('marMinLen').value, 10) || 4, 10));
+    mar.maxLen = Math.max(mar.minLen, Math.min(parseInt(document.getElementById('marMaxLen').value, 10) || 7, 10));
+    mar.types = marEnabledTypes();
+    mar.round = 0;
+    mar.correct = 0;
+    mar.incorrect = 0;
+    mar.skipped = 0;
+    mar.score = 0;
+    mar.streak = 0;
+    mar.bestStreak = 0;
+    mar.finished = false;
+    mar.startTime = Date.now();
+
+    document.getElementById('marathonPlay').style.display = '';
+    marNextRound();
+  }
+
+  function marFormatTime(ms) {
+    if (ms < 0) ms = 0;
+    return (ms / 1000).toFixed(1) + 's';
+  }
+
+  function marTickTimer() {
+    const remaining = mar.deadline - Date.now();
+    const label = document.getElementById('marTimeLeft');
+    if (label) label.textContent = marFormatTime(remaining);
+    const fill = document.getElementById('marRoundBarFill');
+    if (fill) {
+      const pct = Math.max(0, Math.min(100, (remaining / (mar.roundSeconds * 1000)) * 100));
+      fill.style.width = pct + '%';
+      fill.classList.toggle('marathon-bar-urgent', pct < 25);
+    }
+    if (remaining <= 0 && !mar.finished) {
+      mar.skipped++;
+      showToast('⏱ หมดเวลา! คำตอบ: ' + mar.current.revealWord);
+      marNextRound();
+    }
+  }
+
+  function marNextRound() {
+    if (mar.timerHandle) { clearInterval(mar.timerHandle); mar.timerHandle = null; }
+    if (mar.round >= mar.rounds) { marFinish(); return; }
+
+    const round = marBuildRound();
+    if (!round) {
+      showToast('ไม่พบโจทย์ที่สร้างได้ — จบ Marathon ก่อนกำหนด');
+      marFinish();
+      return;
+    }
+    mar.round++;
+    mar.current = round;
+    mar.deadline = Date.now() + mar.roundSeconds * 1000;
+    mar.timerHandle = setInterval(marTickTimer, 100);
+    marRenderPlay();
+  }
+
+  function marTypeLabel(type) {
+    if (type === 'anagram') return '🔀 Anagram';
+    if (type === 'rack') return '🁢 Rack';
+    return '🗂️ Cardbox';
+  }
+
+  function marRenderPlay() {
+    const area = document.getElementById('marathonPlay');
+    if (mar.finished) { marRenderSummary(area); return; }
+
+    const item = mar.current;
+    const progressLabel = 'รอบที่ ' + mar.round + ' / ' + mar.rounds +
+      ' · คะแนนรวม ' + mar.score +
+      ' · ถูกต่อเนื่อง ' + mar.streak +
+      ' · ⏱️ <span id="marTimeLeft">' + marFormatTime(mar.deadline - Date.now()) + '</span>';
+
+    area.innerHTML =
+      '<div class="session-progress">' + progressLabel + '</div>' +
+      '<div class="session-bar"><div class="session-bar-fill marathon-round-bar" id="marRoundBarFill" style="width:100%"></div></div>' +
+      '<div class="session-card">' +
+        '<div class="session-prompt-label">' + marTypeLabel(item.type) +
+          (item.type === 'anagram' ? ' — เรียงตัวอักษรใหม่ให้เป็นคำศัพท์ใดก็ได้ที่ถูกต้อง' :
+           item.type === 'rack' ? ' — หาคำศัพท์ใดก็ได้ที่ประกอบจากตัวอักษรใน Rack นี้' :
+           ' — คำจาก Cardbox ของคุณ ลองพิมพ์ให้ถูกต้อง') +
+        '</div>' +
+        tileRowHTML(item.display, 'big') +
+        '<form class="session-answer-form" id="marForm">' +
+          '<input type="text" id="marInput" autocomplete="off" placeholder="พิมพ์คำแล้วกด Enter" autofocus>' +
+          '<button class="btn btn-primary" type="submit">ส่งคำตอบ</button>' +
+        '</form>' +
+        '<div class="session-controls">' +
+          '<button class="btn btn-outline" id="marSkipBtn">⏭ ข้ามรอบนี้</button>' +
+          '<button class="btn btn-danger btn-sm" id="marEndBtn">⏹ จบ Marathon</button>' +
+        '</div>' +
+      '</div>';
+
+    const form = document.getElementById('marForm');
+    const input = document.getElementById('marInput');
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const guess = input.value.trim().toUpperCase();
+      if (!guess || !mar.current) return;
+      if (mar.current.accepted.has(guess)) {
+        const gained = wordScore(guess) + Math.floor(mar.streak / 3) * 2; // small streak bonus
+        mar.score += gained;
+        mar.correct++;
+        mar.streak++;
+        mar.bestStreak = Math.max(mar.bestStreak, mar.streak);
+        showToast('✓ ถูกต้อง! +' + gained + ' คะแนน');
+        if (window.Achievements) window.Achievements.record('marathon_correct', { count: 1, streak: mar.streak });
+        marNextRound();
+      } else {
+        mar.incorrect++;
+        mar.streak = 0;
+        showToast('✗ ไม่ถูกต้อง ลองอีกครั้ง');
+        input.value = '';
+        input.focus();
+      }
+    });
+
+    document.getElementById('marSkipBtn').addEventListener('click', function () {
+      mar.skipped++;
+      mar.streak = 0;
+      marNextRound();
+    });
+
+    document.getElementById('marEndBtn').addEventListener('click', marFinish);
+  }
+
+  function marFinish() {
+    mar.finished = true;
+    if (mar.timerHandle) { clearInterval(mar.timerHandle); mar.timerHandle = null; }
+    if (mar.round >= mar.rounds && mar.round > 0) {
+      if (window.Achievements) window.Achievements.record('marathon_complete', { rounds: mar.round, bestStreak: mar.bestStreak });
+    }
+    marRenderPlay();
+  }
+
+  function marRenderSummary(area) {
+    const elapsedMs = Date.now() - mar.startTime;
+    area.innerHTML =
+      '<div class="session-summary">' +
+        '<div class="big-stat">' + mar.score + '</div>' +
+        '<div class="field-hint" style="margin-bottom:1rem">คะแนนรวม · ตอบถูก ' + mar.correct + ' / ' + mar.round +
+          ' รอบ · Streak สูงสุด ' + mar.bestStreak + ' · พลาด ' + mar.incorrect + ' · ข้าม/หมดเวลา ' + mar.skipped +
+          ' · ใช้เวลา ' + Math.round(elapsedMs / 1000) + ' วินาที</div>' +
+        '<div class="session-controls" style="margin-top:1.2rem">' +
+          '<button class="btn btn-primary" id="marPlayAgainBtn">🔁 เล่นอีกรอบ</button>' +
+        '</div>' +
+      '</div>';
+
+    document.getElementById('marPlayAgainBtn').addEventListener('click', function () {
+      document.getElementById('marathonSetup').style.display = '';
+      document.getElementById('marathonPlay').style.display = 'none';
+    });
+  }
+
+  function initMarathonGame() {
+    document.getElementById('marStartBtn').addEventListener('click', function () {
+      document.getElementById('marathonSetup').style.display = 'none';
+      marStart();
+    });
+  }
+
   // ---------- Minigame sub-tab toggle ----------
 
   function initMinigameTabs() {
     const typingBtn = document.getElementById('gameTabTyping');
     const racksBtn = document.getElementById('gameTabRacks');
+    const alphaBtn = document.getElementById('gameTabAlpha');
+    const marathonBtn = document.getElementById('gameTabMarathon');
     const typingPanel = document.getElementById('typingGamePanel');
     const racksPanel = document.getElementById('racksGamePanel');
-    typingBtn.addEventListener('click', function () {
-      typingBtn.classList.add('btn-primary'); typingBtn.classList.remove('btn-outline');
-      racksBtn.classList.add('btn-outline'); racksBtn.classList.remove('btn-primary');
-      typingPanel.style.display = ''; racksPanel.style.display = 'none';
-    });
-    racksBtn.addEventListener('click', function () {
-      racksBtn.classList.add('btn-primary'); racksBtn.classList.remove('btn-outline');
-      typingBtn.classList.add('btn-outline'); typingBtn.classList.remove('btn-primary');
-      racksPanel.style.display = ''; typingPanel.style.display = 'none';
-    });
+    const alphaPanel = document.getElementById('alphaGamePanel');
+    const marathonPanel = document.getElementById('marathonGamePanel');
+    const allBtns = [typingBtn, racksBtn, alphaBtn, marathonBtn];
+    const allPanels = [typingPanel, racksPanel, alphaPanel, marathonPanel];
+
+    function activate(activeBtn, activePanel) {
+      allBtns.forEach(function (b) {
+        if (b === activeBtn) { b.classList.add('btn-primary'); b.classList.remove('btn-outline'); }
+        else { b.classList.add('btn-outline'); b.classList.remove('btn-primary'); }
+      });
+      allPanels.forEach(function (p) { p.style.display = (p === activePanel) ? '' : 'none'; });
+    }
+
+    typingBtn.addEventListener('click', function () { activate(typingBtn, typingPanel); });
+    racksBtn.addEventListener('click', function () { activate(racksBtn, racksPanel); });
+    alphaBtn.addEventListener('click', function () { activate(alphaBtn, alphaPanel); });
+    marathonBtn.addEventListener('click', function () { activate(marathonBtn, marathonPanel); });
   }
 
   // ---------- global keyboard shortcuts ----------
@@ -2000,6 +2584,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     loadSettings();
     applyTheme();
+    applyFontSettings();
     loadCustomWords();
     initTabs();
     applyI18n();
@@ -2013,9 +2598,15 @@
     initTypingGame();
     initTgTypedPanel();
     initRacksGame();
+    initAlphaGame();
+    initMarathonGame();
     initMinigameTabs();
     initDashSuggested();
     initGlobalShortcuts();
+    if (window.Achievements) {
+      window.Achievements.init();
+      window.Achievements.renderTab();
+    }
     renderCardboxTab();
     renderDashboard();
   });
