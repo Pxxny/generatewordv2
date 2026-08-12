@@ -413,17 +413,12 @@
 
   // ---------- shared word-row + anagram toggle rendering ----------
 
-  function wordRowHTML(word, opts) {
+  function wordRowHTML(word) {
     uidCounter++;
     const uid = uidCounter;
-    const withSelect = opts && opts.selectable;
-    const checkbox = withSelect
-      ? '<input type="checkbox" class="browse-select-check" data-word="' + word + '" style="width:1.05rem;height:1.05rem;accent-color:var(--brass);cursor:pointer;flex-shrink:0">'
-      : '';
     return (
       '<div class="word-row" data-word="' + word + '">' +
         '<div class="word-row-top">' +
-          (withSelect ? checkbox : '') +
           '<div>' + tileRowHTML(word) + '</div>' +
           '<div class="word-meta">' + word.length + ' ตัวอักษร · ' + wordScore(word) + ' คะแนน</div>' +
           '<button class="anagram-toggle" data-uid="' + uid + '" data-word="' + word + '">🔤 ดู Anagram</button>' +
@@ -603,7 +598,6 @@
         if (btn.dataset.tab === 'browse' && !browseInitialized) {
           browseInitialized = true;
           initBrowseChips();
-          initBrowseSelection();
           runBrowseSearch();
         }
       });
@@ -1323,7 +1317,13 @@
 
   // ---------- Word browser tab ----------
 
-  const browseState = { activeLength: 'all', results: [], shown: 0, selected: new Set() };
+  const browseState = { activeLength: 'all', results: [], shown: 0 };
+
+  const BROWSE_FILTER_IDS = [
+    'filterStarts', 'filterEnds', 'filterContains', 'filterContainsAll',
+    'filterScoreMin', 'filterScoreMax', 'filterPattern', 'filterRack',
+    'filterVowelMin', 'filterVowelMax'
+  ];
 
   function initBrowseChips() {
     const wrap = document.getElementById('browseLengthChips');
@@ -1341,63 +1341,56 @@
       });
     });
 
-    ['filterStarts', 'filterEnds', 'filterContains', 'filterContainsAll', 'filterScoreMin', 'filterScoreMax'].forEach(function (id) {
-      document.getElementById(id).addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') runBrowseSearch();
+    // Progressive search: re-run the search in real time as the person types,
+    // debounced so fast typing doesn't re-filter the whole dictionary on
+    // every single keystroke. Enter still triggers an immediate search.
+    let browseDebounceHandle = null;
+    BROWSE_FILTER_IDS.forEach(function (id) {
+      const el = document.getElementById(id);
+      el.addEventListener('input', function () {
+        if (browseDebounceHandle) clearTimeout(browseDebounceHandle);
+        browseDebounceHandle = setTimeout(runBrowseSearch, 200);
+      });
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          if (browseDebounceHandle) clearTimeout(browseDebounceHandle);
+          runBrowseSearch();
+        }
       });
     });
     document.getElementById('browseSearchBtn').addEventListener('click', runBrowseSearch);
     document.getElementById('browseClearBtn').addEventListener('click', function () {
-      ['filterStarts', 'filterEnds', 'filterContains', 'filterContainsAll', 'filterScoreMin', 'filterScoreMax'].forEach(function (id) {
-        document.getElementById(id).value = '';
-      });
+      BROWSE_FILTER_IDS.forEach(function (id) { document.getElementById(id).value = ''; });
       runBrowseSearch();
     });
     document.getElementById('browseLoadMoreBtn').addEventListener('click', function () { renderBrowseResults(false); });
   }
 
-  function initBrowseSelection() {
-    document.getElementById('browseSelectAll').addEventListener('change', function (e) {
-      const checked = e.target.checked;
-      document.querySelectorAll('.browse-select-check').forEach(function (cb) {
-        cb.checked = checked;
-        if (checked) browseState.selected.add(cb.dataset.word);
-        else browseState.selected.delete(cb.dataset.word);
-      });
-      updateBrowseSelectedCount();
-    });
+  const VOWELS = { A: 1, E: 1, I: 1, O: 1, U: 1 };
 
-    document.getElementById('browseSelectRandomBtn').addEventListener('click', function () {
-      if (!browseState.results.length) { showToast('ยังไม่มีผลลัพธ์ให้เลือก — ค้นหาก่อน'); return; }
-      let n = parseInt(document.getElementById('browseRandomCount').value, 10) || 10;
-      n = Math.max(1, Math.min(n, browseState.results.length));
-      const picks = shuffle(browseState.results.slice()).slice(0, n);
-      browseState.selected = new Set(picks);
-      // make sure the random picks are loaded/rendered so their checkboxes exist
-      const neededShown = Math.max.apply(null, picks.map(function (w) { return browseState.results.indexOf(w); })) + 1;
-      while (browseState.shown < neededShown && browseState.shown < browseState.results.length) {
-        renderBrowseResults(false);
-      }
-      document.querySelectorAll('.browse-select-check').forEach(function (cb) {
-        cb.checked = browseState.selected.has(cb.dataset.word);
-      });
-      updateBrowseSelectedCount();
-      showToast('สุ่มเลือกแล้ว ' + browseState.selected.size + ' คำ');
-    });
+  function vowelRatioPct(word) {
+    let v = 0;
+    for (let i = 0; i < word.length; i++) if (VOWELS[word[i]]) v++;
+    return (v / word.length) * 100;
+  }
 
-    document.getElementById('browseClearSelectionBtn').addEventListener('click', function () {
-      browseState.selected = new Set();
-      document.querySelectorAll('.browse-select-check').forEach(function (cb) { cb.checked = false; });
-      updateBrowseSelectedCount();
-    });
+  // Pattern like "C_C" or "?AT": '_' and '?' match any single letter,
+  // any other character must match exactly. Length must match the word.
+  function wordMatchesPattern(word, pattern) {
+    if (word.length !== pattern.length) return false;
+    for (let i = 0; i < pattern.length; i++) {
+      const p = pattern[i];
+      if (p === '_' || p === '?') continue;
+      if (p !== word[i]) return false;
+    }
+    return true;
+  }
 
-    document.getElementById('browseSaveCardboxBtn').addEventListener('click', function () {
-      if (!browseState.selected.size) { showToast('กรุณาเลือกคำศัพท์อย่างน้อย 1 คำ (หรือกด Select All / Select Random)'); return; }
-      const added = addWordsToCardbox(Array.from(browseState.selected));
-      showToast('บันทึกลง Cardbox แล้ว ' + added + ' คำ');
-      renderCardboxTab();
-      renderDashboard();
-    });
+  // Rack string like "AEINRT" or "AEIN?T" ('?' = blank, matches any letter).
+  // The word must be fully buildable from the given letters (each rack
+  // letter usable once), independent of position/order.
+  function wordPlayableFromRack(word, rackCounts, blankCount) {
+    return isSubsetOfCountsWithBlanks(word, rackCounts, blankCount);
   }
 
   function wordMatchesFilters(word, f) {
@@ -1411,27 +1404,11 @@
     }
     if (f.scoreMin != null && wordScore(word) < f.scoreMin) return false;
     if (f.scoreMax != null && wordScore(word) > f.scoreMax) return false;
+    if (f.pattern && !wordMatchesPattern(word, f.pattern)) return false;
+    if (f.rackCounts && !wordPlayableFromRack(word, f.rackCounts, f.rackBlanks)) return false;
+    if (f.vowelMin != null && vowelRatioPct(word) < f.vowelMin) return false;
+    if (f.vowelMax != null && vowelRatioPct(word) > f.vowelMax) return false;
     return true;
-  }
-
-  function updateBrowseSelectedCount() {
-    document.getElementById('browseSelectedCount').textContent = 'เลือกแล้ว ' + browseState.selected.size + ' คำ';
-    const allChecks = document.querySelectorAll('.browse-select-check');
-    const allChecked = allChecks.length > 0 && Array.from(allChecks).every(function (cb) { return cb.checked; });
-    document.getElementById('browseSelectAll').checked = allChecked;
-  }
-
-  function bindBrowseSelectChecks(container) {
-    container.querySelectorAll('.browse-select-check').forEach(function (cb) {
-      if (cb.dataset.bound) return;
-      cb.dataset.bound = '1';
-      cb.checked = browseState.selected.has(cb.dataset.word);
-      cb.addEventListener('change', function () {
-        if (cb.checked) browseState.selected.add(cb.dataset.word);
-        else browseState.selected.delete(cb.dataset.word);
-        updateBrowseSelectedCount();
-      });
-    });
   }
 
   function runBrowseSearch() {
@@ -1441,17 +1418,40 @@
     const containsAllRaw = document.getElementById('filterContainsAll').value.trim().toUpperCase();
     const scoreMinRaw = document.getElementById('filterScoreMin').value;
     const scoreMaxRaw = document.getElementById('filterScoreMax').value;
+    const patternRaw = document.getElementById('filterPattern').value.trim().toUpperCase();
+    const rackRaw = document.getElementById('filterRack').value.trim().toUpperCase();
+    const vowelMinRaw = document.getElementById('filterVowelMin').value;
+    const vowelMaxRaw = document.getElementById('filterVowelMax').value;
+
+    let rackCounts = null;
+    let rackBlanks = 0;
+    if (rackRaw) {
+      const rackLetters = rackRaw.replace(/[^A-Z?]/g, '');
+      rackBlanks = (rackLetters.match(/\?/g) || []).length;
+      rackCounts = letterCounts(rackLetters.replace(/\?/g, ''));
+    }
 
     const f = {
       starts: starts, ends: ends, contains: contains,
       containsAll: containsAllRaw ? Array.from(new Set(containsAllRaw.split(''))) : null,
       scoreMin: scoreMinRaw ? parseInt(scoreMinRaw, 10) : null,
-      scoreMax: scoreMaxRaw ? parseInt(scoreMaxRaw, 10) : null
+      scoreMax: scoreMaxRaw ? parseInt(scoreMaxRaw, 10) : null,
+      pattern: patternRaw ? patternRaw.replace(/[^A-Z_?]/g, '') : null,
+      rackCounts: rackCounts, rackBlanks: rackBlanks,
+      vowelMin: vowelMinRaw ? parseFloat(vowelMinRaw) : null,
+      vowelMax: vowelMaxRaw ? parseFloat(vowelMaxRaw) : null
     };
-    const hasFilters = !!(starts || ends || contains || f.containsAll || f.scoreMin != null || f.scoreMax != null);
+    const hasFilters = !!(
+      starts || ends || contains || f.containsAll || f.scoreMin != null || f.scoreMax != null ||
+      f.pattern || f.rackCounts || f.vowelMin != null || f.vowelMax != null
+    );
 
     let candidates = [];
-    if (browseState.activeLength === 'all') {
+    if (f.pattern) {
+      // Pattern search implies a fixed word length, so narrow to that length
+      // directly instead of scanning every length in the dictionary.
+      candidates = lengthPool(f.pattern.length);
+    } else if (browseState.activeLength === 'all') {
       for (let L = CSW24_MIN_LEN; L <= CSW24_MAX_LEN; L++) candidates = candidates.concat(lengthPool(L));
     } else {
       candidates = lengthPool(browseState.activeLength);
@@ -1460,24 +1460,20 @@
     const results = hasFilters ? candidates.filter(function (w) { return wordMatchesFilters(w, f); }) : candidates;
     browseState.results = results;
     browseState.shown = 0;
-    browseState.selected = new Set();
 
     document.getElementById('browseResultCount').textContent = 'พบ ' + results.length.toLocaleString('en-US') + ' คำ';
     renderBrowseResults(true);
-    updateBrowseSelectedCount();
   }
 
   function renderBrowseResults(reset) {
     const wrap = document.getElementById('browseResults');
     if (reset) wrap.innerHTML = '';
     const slice = browseState.results.slice(browseState.shown, browseState.shown + PAGE_SIZE);
-    wrap.insertAdjacentHTML('beforeend', slice.map(function (w) { return wordRowHTML(w, { selectable: true }); }).join(''));
+    wrap.insertAdjacentHTML('beforeend', slice.map(wordRowHTML).join(''));
     bindAnagramToggles(wrap);
-    bindBrowseSelectChecks(wrap);
     browseState.shown += slice.length;
     document.getElementById('browseLoadMoreWrap').style.display =
       browseState.shown < browseState.results.length ? '' : 'none';
-    updateBrowseSelectedCount();
   }
 
   // ---------- Minigame: typing ----------
@@ -1493,12 +1489,10 @@
     return pool;
   }
 
-  function tgApplyContainsAllFilter(words, lettersStr) {
-    const letters = (lettersStr || '').toUpperCase().replace(/[^A-Z]/g, '').split('');
-    if (!letters.length) return words;
-    return words.filter(function (w) {
-      return letters.every(function (ch) { return w.indexOf(ch) !== -1; });
-    });
+  function tgApplyContainsAllFilter(words, substr) {
+    const needle = (substr || '').toUpperCase().trim();
+    if (!needle) return words;
+    return words.filter(function (w) { return w.indexOf(needle) !== -1; });
   }
 
   function tgWordsFromCardbox() {
@@ -1585,12 +1579,18 @@
         let len = parseInt(document.getElementById('tgMin').value, 10) || CSW24_MIN_LEN;
         len = Math.max(CSW24_MIN_LEN, Math.min(len, CSW24_MAX_LEN));
         words = tgWordsForLetterMode(len);
+        const containsAllPre = containsAllToggle.checked ? document.getElementById('tgContainsAllInput').value : '';
+        if (containsAllPre) words = tgApplyContainsAllFilter(words, containsAllPre);
       } else if (tg.mode === 'cardbox') {
         words = tgWordsFromCardbox();
-        if (!words.length) { showToast('Cardbox ยังไม่มีคำศัพท์'); return; }
+        const containsAllPre = containsAllToggle.checked ? document.getElementById('tgContainsAllInput').value : '';
+        if (containsAllPre) words = tgApplyContainsAllFilter(words, containsAllPre);
+        if (!words.length) { showToast('Cardbox ยังไม่มีคำศัพท์ที่ตรงเงื่อนไข'); return; }
       } else if (tg.mode === 'suggested') {
         words = tgWordsFromSuggested();
-        if (!words.length) { showToast('ยังไม่มีคำแนะนำจาก Dashboard'); return; }
+        const containsAllPre = containsAllToggle.checked ? document.getElementById('tgContainsAllInput').value : '';
+        if (containsAllPre) words = tgApplyContainsAllFilter(words, containsAllPre);
+        if (!words.length) { showToast('ยังไม่มีคำแนะนำจาก Dashboard ที่ตรงเงื่อนไข'); return; }
       } else {
         let min = parseInt(document.getElementById('tgMin').value, 10) || CSW24_MIN_LEN;
         let max = parseInt(document.getElementById('tgMax').value, 10) || CSW24_MAX_LEN;
@@ -1598,13 +1598,23 @@
         min = Math.max(CSW24_MIN_LEN, Math.min(min, CSW24_MAX_LEN));
         max = Math.max(CSW24_MIN_LEN, Math.min(max, CSW24_MAX_LEN));
         if (min > max) { const t2 = min; min = max; max = t2; }
-        count = Math.max(1, Math.min(count, 100));
-        words = pickRandomWords(min, max, count);
+        count = Math.max(1, count);
+
+        const containsAllPre = containsAllToggle.checked ? document.getElementById('tgContainsAllInput').value : '';
+        if (containsAllPre) {
+          // Filter the full candidate pool by the substring first, then randomly
+          // sample `count` from the matches — filtering after picking would
+          // silently shrink the result set below what the user asked for.
+          let pool = [];
+          for (let L = min; L <= max; L++) pool = pool.concat(lengthPool(L));
+          pool = tgApplyContainsAllFilter(pool, containsAllPre);
+          words = shuffle(pool.slice()).slice(0, Math.min(count, pool.length));
+        } else {
+          words = pickRandomWords(min, max, count);
+        }
       }
 
       const containsAll = containsAllToggle.checked ? document.getElementById('tgContainsAllInput').value : '';
-      if (containsAll) words = tgApplyContainsAllFilter(words, containsAll);
-
       if (!words.length) { showToast('ไม่พบคำศัพท์ที่ตรงกับเงื่อนไขที่เลือก'); return; }
 
       tg.words = words;
