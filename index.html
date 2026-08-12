@@ -210,6 +210,35 @@
         <div class="field"><label for="filterScoreMin">คะแนนต่ำสุด</label><input type="number" id="filterScoreMin" min="0" placeholder="0"></div>
         <div class="field"><label for="filterScoreMax">คะแนนสูงสุด</label><input type="number" id="filterScoreMax" min="0" placeholder="100"></div>
       </div>
+
+      <p class="panel-sub" style="margin:0.9rem 0 0.5rem;font-weight:600">ตัวกรองขั้นสูง</p>
+      <div class="control-row">
+        <div class="field">
+          <label for="filterPattern">รูปแบบคำ (Pattern)</label>
+          <input type="text" id="filterPattern" maxlength="15" placeholder="เช่น C_C หรือ ?AT">
+        </div>
+        <div class="field">
+          <label for="filterRack">เล่นได้จาก Rack (ตัวอักษรที่มี)</label>
+          <input type="text" id="filterRack" maxlength="20" placeholder="เช่น AEINRT หรือใช้ ? แทน Blank">
+        </div>
+      </div>
+      <p class="field-hint" style="margin:-0.4rem 0 0.7rem">
+        Pattern: ใช้ <code>_</code> หรือ <code>?</code> แทนตัวอักษรใดก็ได้ในตำแหน่งนั้น (ความยาวของ Pattern ต้องตรงกับคำ) ·
+        Rack: คำจะต้องประกอบขึ้นได้จากตัวอักษรที่ระบุเท่านั้น (ใช้แต่ละตัวได้ไม่เกินจำนวนที่มี ใส่ <code>?</code> เป็น Blank ใช้แทนตัวอักษรใดก็ได้)
+      </p>
+
+      <div class="control-row">
+        <div class="field">
+          <label for="filterVowelMin">สัดส่วนสระขั้นต่ำ (%)</label>
+          <input type="number" id="filterVowelMin" min="0" max="100" placeholder="0">
+        </div>
+        <div class="field">
+          <label for="filterVowelMax">สัดส่วนสระสูงสุด (%)</label>
+          <input type="number" id="filterVowelMax" min="0" max="100" placeholder="100">
+        </div>
+      </div>
+      <p class="field-hint" style="margin:-0.4rem 0 0.7rem">สัดส่วนสระ = จำนวนสระ (A E I O U) ÷ ความยาวคำ × 100 — ใช้หาคำที่มีสระเยอะ/น้อยเป็นพิเศษ</p>
+
       <div class="btn-row">
         <button class="btn btn-primary" id="browseSearchBtn" data-i18n="browse.search">🔍 ค้นหา (Enter)</button>
         <button class="btn btn-outline btn-sm" id="browseClearBtn" data-i18n="browse.clear">ล้างตัวกรอง</button>
@@ -218,21 +247,9 @@
     </div>
 
     <div class="panel-card">
-      <div class="quiz-list-head">
-        <label class="checkbox-field"><input type="checkbox" id="browseSelectAll"> <span>เลือกทั้งหมด (ที่โหลดแล้ว)</span></label>
-        <span class="selected-count" id="browseSelectedCount">เลือกแล้ว 0 คำ</span>
-      </div>
-      <div class="control-row" style="margin-bottom:0.7rem">
-        <div class="field"><label for="browseRandomCount">สุ่มเลือก</label><input type="number" id="browseRandomCount" min="1" value="10" style="max-width:6rem"></div>
-        <button class="btn btn-outline btn-sm" id="browseSelectRandomBtn" style="align-self:end">🎲 Select Random</button>
-        <button class="btn btn-outline btn-sm" id="browseClearSelectionBtn" style="align-self:end">ล้างการเลือก</button>
-      </div>
       <div id="browseResults"></div>
       <div class="btn-row" id="browseLoadMoreWrap" style="display:none">
         <button class="btn btn-outline" id="browseLoadMoreBtn">โหลดเพิ่ม</button>
-      </div>
-      <div class="btn-row" style="margin-top:0.8rem">
-        <button class="btn btn-teal" id="browseSaveCardboxBtn">💾 Save to Cardbox</button>
       </div>
     </div>
   </section>
@@ -264,16 +281,16 @@
         <div class="control-row" id="tgRangeRow">
           <div class="field"><label for="tgMin">ความยาวต่ำสุด</label><input type="number" id="tgMin" min="2" max="15" value="2"></div>
           <div class="field"><label for="tgMax">ความยาวสูงสุด</label><input type="number" id="tgMax" min="2" max="15" value="4"></div>
-          <div class="field" id="tgCountField"><label for="tgCount">จำนวนคำ</label><input type="number" id="tgCount" min="1" max="100" value="10"></div>
+          <div class="field" id="tgCountField"><label for="tgCount">จำนวนคำ</label><input type="number" id="tgCount" min="1" value="10"></div>
         </div>
         <div class="field" id="tgLetterNote" style="display:none;margin-bottom:0.6rem">
           <span class="panel-sub" style="margin:0">โหมดนี้ใช้ความยาวเดียว และเอาคำ "ทุกคำ" ที่มีความยาวนั้นมาให้พิมพ์ทั้งหมด (ไม่จำกัดจำนวน)</span>
         </div>
         <div class="control-row">
-          <label class="checkbox-field"><input type="checkbox" id="tgContainsAllToggle"> 🔎 Contains all (ต้องมีตัวอักษรครบตามที่ระบุ)</label>
+          <label class="checkbox-field"><input type="checkbox" id="tgContainsAllToggle"> 🔎 มีข้อความนี้อยู่ในคำ (Contains)</label>
           <div class="field" id="tgContainsAllField" style="display:none">
-            <label for="tgContainsAllInput">ตัวอักษรที่ต้องมี</label>
-            <input type="text" id="tgContainsAllInput" placeholder="เช่น AE" maxlength="12" style="text-transform:uppercase">
+            <label for="tgContainsAllInput">ข้อความที่ต้องมี (เรียงติดกัน ไม่สนตำแหน่ง)</label>
+            <input type="text" id="tgContainsAllInput" placeholder="เช่น QU" maxlength="12" style="text-transform:uppercase">
           </div>
         </div>
         <div class="control-row">
