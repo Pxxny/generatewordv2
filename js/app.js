@@ -867,6 +867,14 @@
     const studyCountInput = document.getElementById('studyCount');
     studyCountInput.max = Math.max(1, box.length);
     if (parseInt(studyCountInput.value, 10) > box.length) studyCountInput.value = Math.max(1, box.length);
+
+    const minLenInput = document.getElementById('studyMinLen');
+    const maxLenInput = document.getElementById('studyMaxLen');
+    if (minLenInput && maxLenInput && box.length && !minLenInput.dataset.touched && !maxLenInput.dataset.touched) {
+      const lens = box.map(function (c) { return c.word.length; });
+      minLenInput.value = Math.min.apply(null, lens);
+      maxLenInput.value = Math.max.apply(null, lens);
+    }
   }
 
   function initCardboxTab() {
@@ -875,6 +883,9 @@
     });
     document.getElementById('anagramOrderField').style.display = 'none';
 
+    document.getElementById('studyMinLen').addEventListener('change', function (e) { e.target.dataset.touched = '1'; });
+    document.getElementById('studyMaxLen').addEventListener('change', function (e) { e.target.dataset.touched = '1'; });
+
     document.getElementById('startStudyBtn').addEventListener('click', function () {
       const box = loadCardbox();
       if (!box.length) { showToast('Cardbox ว่างอยู่ — เลือกคำศัพท์จากแท็บแบบทดสอบก่อน'); return; }
@@ -882,11 +893,16 @@
       const mode = document.getElementById('studyMode').value;
       const anagramOrder = document.getElementById('anagramOrder').value;
       const dueOnly = document.getElementById('dueOnlyToggle').checked;
+      const minLen = Math.max(1, parseInt(document.getElementById('studyMinLen').value, 10) || 1);
+      const maxLen = Math.max(minLen, parseInt(document.getElementById('studyMaxLen').value, 10) || 99);
       const now = Date.now();
 
       let pool = dueOnly ? box.filter(function (c) { return (c.due || 0) <= now; }) : box.slice();
-      if (dueOnly && !pool.length) {
-        showToast('ไม่มีคำที่ถึงกำหนดทบทวนตอนนี้ — ลองปิด "เฉพาะคำที่ถึงกำหนด" เพื่อทบทวนคำอื่น');
+      pool = pool.filter(function (c) { return c.word.length >= minLen && c.word.length <= maxLen; });
+      if (!pool.length) {
+        showToast(dueOnly
+          ? 'ไม่มีคำที่ถึงกำหนดทบทวนในช่วงความยาวนี้ — ลองปรับความยาวหรือปิด "เฉพาะคำที่ถึงกำหนด"'
+          : 'ไม่มีคำใน Cardbox ที่อยู่ในช่วงความยาวนี้');
         return;
       }
       pool.sort(function (a, b) { return (a.due || 0) - (b.due || 0); });
@@ -1499,11 +1515,7 @@
     if (f.starts && !word.startsWith(f.starts)) return false;
     if (f.ends && !word.endsWith(f.ends)) return false;
     if (f.contains && word.indexOf(f.contains) === -1) return false;
-    if (f.containsAll) {
-      for (let i = 0; i < f.containsAll.length; i++) {
-        if (word.indexOf(f.containsAll[i]) === -1) return false;
-      }
-    }
+    if (f.containsAll && !wordContainsLettersAnywhere(word, f.containsAll)) return false;
     if (f.scoreMin != null && wordScore(word) < f.scoreMin) return false;
     if (f.scoreMax != null && wordScore(word) > f.scoreMax) return false;
     if (f.pattern && !wordMatchesPattern(word, f.pattern)) return false;
@@ -1535,7 +1547,7 @@
 
     const f = {
       starts: starts, ends: ends, contains: contains,
-      containsAll: containsAllRaw ? Array.from(new Set(containsAllRaw.split(''))) : null,
+      containsAll: containsAllRaw ? containsAllRaw.replace(/[^A-Z?]/g, '') : null,
       scoreMin: scoreMinRaw ? parseInt(scoreMinRaw, 10) : null,
       scoreMax: scoreMaxRaw ? parseInt(scoreMaxRaw, 10) : null,
       pattern: patternRaw ? patternRaw.replace(/[^A-Z_?]/g, '') : null,
@@ -1591,10 +1603,30 @@
     return pool;
   }
 
-  function tgApplyContainsAllFilter(words, substr) {
-    const needle = (substr || '').toUpperCase().trim();
-    if (!needle) return words;
-    return words.filter(function (w) { return w.indexOf(needle) !== -1; });
+  // Letters (and optional '?' wildcards) must all be present in the word
+  // somewhere, regardless of position/order. Repeated letters in the needle
+  // require that many occurrences in the word (e.g. "NN" needs 2 N's).
+  // Each '?' in the needle is a wildcard that can cover any one missing letter,
+  // like a Scrabble blank tile.
+  function wordContainsLettersAnywhere(word, needle) {
+    const clean = (needle || '').toUpperCase().replace(/[^A-Z?]/g, '');
+    if (!clean) return true;
+    const blankCount = (clean.match(/\?/g) || []).length;
+    const letters = clean.replace(/\?/g, '');
+    const needCounts = letterCounts(letters);
+    const wordCounts = letterCounts(word);
+    let blanksUsed = 0;
+    for (const ch in needCounts) {
+      const have = wordCounts[ch] || 0;
+      const short = needCounts[ch] - have;
+      if (short > 0) blanksUsed += short;
+    }
+    return blanksUsed <= blankCount;
+  }
+
+  function tgApplyContainsAllFilter(words, needle) {
+    if (!needle || !needle.trim()) return words;
+    return words.filter(function (w) { return wordContainsLettersAnywhere(w, needle); });
   }
 
   function tgWordsFromCardbox() {
