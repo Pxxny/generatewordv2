@@ -133,6 +133,14 @@
             <label for="studyCount" data-i18n="cardbox.studyCount">จำนวนคำที่ทบทวน</label>
             <input type="number" id="studyCount" min="1" value="10">
           </div>
+          <div class="field">
+            <label for="studyMinLen">ความยาวต่ำสุด</label>
+            <input type="number" id="studyMinLen" min="2" max="15" value="2">
+          </div>
+          <div class="field">
+            <label for="studyMaxLen">ความยาวสูงสุด</label>
+            <input type="number" id="studyMaxLen" min="2" max="15" value="15">
+          </div>
           <label class="checkbox-field"><input type="checkbox" id="dueOnlyToggle" checked> เฉพาะคำที่ถึงกำหนด</label>
           <button class="btn btn-primary" id="startStudyBtn" data-i18n="cardbox.start">▶ เริ่มทบทวน</button>
         </div>
@@ -207,7 +215,7 @@
         <div class="field"><label for="filterContains">มีคำว่า (Contains)</label><input type="text" id="filterContains" maxlength="15" placeholder="เช่น AT"></div>
       </div>
       <div class="control-row">
-        <div class="field"><label for="filterContainsAll">มีตัวอักษรครบ (Contains All)</label><input type="text" id="filterContainsAll" maxlength="15" placeholder="เช่น AEI"></div>
+        <div class="field"><label for="filterContainsAll">มีตัวอักษรครบ (Contains All)</label><input type="text" id="filterContainsAll" maxlength="15" placeholder="เช่น AEI หรือ TISANE? (? = Blank)"></div>
         <div class="field"><label for="filterScoreMin">คะแนนต่ำสุด</label><input type="number" id="filterScoreMin" min="0" placeholder="0"></div>
         <div class="field"><label for="filterScoreMax">คะแนนสูงสุด</label><input type="number" id="filterScoreMax" min="0" placeholder="100"></div>
       </div>
@@ -352,10 +360,11 @@
           <span class="panel-sub" style="margin:0">โหมดนี้ใช้ความยาวเดียว และเอาคำ "ทุกคำ" ที่มีความยาวนั้นมาให้พิมพ์ทั้งหมด (ไม่จำกัดจำนวน)</span>
         </div>
         <div class="control-row">
-          <label class="checkbox-field"><input type="checkbox" id="tgContainsAllToggle"> 🔎 มีข้อความนี้อยู่ในคำ (Contains)</label>
+          <label class="checkbox-field"><input type="checkbox" id="tgContainsAllToggle"> 🔎 มีตัวอักษรเหล่านี้อยู่ในคำ (ไม่สนตำแหน่ง)</label>
           <div class="field" id="tgContainsAllField" style="display:none">
-            <label for="tgContainsAllInput">ข้อความที่ต้องมี (เรียงติดกัน ไม่สนตำแหน่ง)</label>
-            <input type="text" id="tgContainsAllInput" placeholder="เช่น QU" maxlength="12" style="text-transform:uppercase">
+            <label for="tgContainsAllInput">ตัวอักษรที่ต้องมี (ไม่สนตำแหน่ง/ลำดับ) — ใส่ ? แทน Blank ได้</label>
+            <input type="text" id="tgContainsAllInput" placeholder="เช่น BN หรือ BN?" maxlength="12" style="text-transform:uppercase">
+            <span class="field-hint">เช่น "BN" จะเจอ BEN, BANANAS ฯลฯ · ถ้าใส่ตัวอักษรซ้ำ เช่น "NN" คำนั้นต้องมี N อย่างน้อย 2 ตัว</span>
           </div>
         </div>
         <div class="control-row">
