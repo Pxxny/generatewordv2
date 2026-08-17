@@ -242,8 +242,10 @@ main {
 
 .tile-word {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 3px;
   vertical-align: middle;
+  max-width: 100%;
 }
 
 .letter-tile {
@@ -263,6 +265,11 @@ main {
 }
 .letter-tile.small { width: 1.4rem; height: 1.4rem; font-size: 0.78rem; border-radius: 3px; }
 .letter-tile.big { width: 2.5rem; height: 2.5rem; font-size: 1.3rem; }
+/* Long words (10+ letters) shrink the "big" tile size so the whole word can
+   realistically fit and wrap on a phone screen instead of overflowing in one
+   unbroken row. */
+.letter-tile.big.long-word { width: 1.9rem; height: 1.9rem; font-size: 1rem; }
+.letter-tile.big.longer-word { width: 1.5rem; height: 1.5rem; font-size: 0.82rem; border-radius: 3px; }
 .letter-tile .pv {
   position: absolute;
   bottom: 1px;
@@ -447,6 +454,7 @@ main {
 .session-feedback { min-height: 1.4rem; font-weight: 700; font-size: 0.95rem; }
 .session-feedback.correct { color: #7fd9a8; }
 .session-feedback.wrong { color: #e08a75; }
+.anagram-found-progress { font-size: 0.8rem; color: #7f9a8d; font-weight: 600; margin: -0.25rem 0 0.25rem; }
 
 .session-controls { display: flex; justify-content: center; gap: 0.7rem; margin-top: 1.3rem; flex-wrap: wrap; }
 .session-summary { text-align: center; padding: 1.5rem 0; }
