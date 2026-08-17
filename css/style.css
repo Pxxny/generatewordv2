@@ -404,6 +404,11 @@ main {
   padding: 0.55rem 0.85rem;
 }
 
+.card-row-select { display: flex; align-items: center; cursor: pointer; }
+.card-row-select input { width: 1.05rem; height: 1.05rem; accent-color: var(--brass); cursor: pointer; }
+
+#cardboxSelectRow { margin-top: 0.6rem; flex-wrap: wrap; gap: 0.9rem; }
+
 .status-pill {
   font-size: 0.7rem;
   font-weight: 700;
