@@ -47,6 +47,7 @@
       'quiz.sub': 'สุ่มคำศัพท์ชุดใหม่ (ค่าเริ่มต้น 50 คำ) เลือกคำที่ถูกใจอยากจำ แล้วกด Save to Cardbox เพื่อเก็บไว้ทบทวน',
       'cardbox.title': 'การ์ดของฉัน (Cardbox)', 'cardbox.studyMode': 'รูปแบบ Quiz',
       'cardbox.anagramOrder': 'การเรียงตัวอักษร', 'cardbox.studyCount': 'จำนวนคำที่ทบทวน', 'cardbox.start': '▶ เริ่มทบทวน',
+      'cardbox.selectedCount': 'เลือกแล้ว 0 คำ', 'cardbox.studySelected': '▶ ทบทวนคำที่เลือก',
       'browse.title': 'คลังคำศัพท์ทั้งหมด', 'browse.search': '🔍 ค้นหา (Enter)', 'browse.clear': 'ล้างตัวกรอง', 'browse.sortLabel': 'เรียงลำดับ',
       'mini.title': '🕹️ Minigame', 'mini.typing': '⌨️ พิมพ์ศัพท์ Random', 'mini.racks': '🁢 Random Racks',
       'mini.alpha': '🔀 Alphagram Blitz', 'mini.marathon': '⚡ Time Attack Marathon',
@@ -87,6 +88,7 @@
       'quiz.sub': 'Randomize a fresh batch (default 50), select the words you want to learn, then Save to Cardbox.',
       'cardbox.title': 'My Cards (Cardbox)', 'cardbox.studyMode': 'Study mode',
       'cardbox.anagramOrder': 'Letter order', 'cardbox.studyCount': 'Words to review', 'cardbox.start': '▶ Start review',
+      'cardbox.selectedCount': '0 selected', 'cardbox.studySelected': '▶ Study selected',
       'browse.title': 'Full word dictionary', 'browse.search': '🔍 Search (Enter)', 'browse.clear': 'Clear filters', 'browse.sortLabel': 'Sort by',
       'mini.title': '🕹️ Minigame', 'mini.typing': '⌨️ Random Word Typing', 'mini.racks': '🁢 Random Racks',
       'mini.alpha': '🔀 Alphagram Blitz', 'mini.marathon': '⚡ Time Attack Marathon',
@@ -1070,6 +1072,12 @@
     cardboxRenderState.sorted = box.slice().sort(function (a, b) { return b.addedAt - a.addedAt; });
     cardboxRenderState.shown = 0;
 
+    // Drop any selected words that no longer exist in the cardbox.
+    const stillPresent = new Set(box.map(function (c) { return c.word; }));
+    cardboxRenderState.selected.forEach(function (w) {
+      if (!stillPresent.has(w)) cardboxRenderState.selected.delete(w);
+    });
+
     const listEl = document.getElementById('cardboxList');
     if (!box.length) {
       listEl.innerHTML = '<div class="empty-state">ยังไม่มีคำศัพท์ใน Cardbox — ไปที่แท็บ "แบบทดสอบ" เพื่อเลือกคำที่อยากจำ</div>';
@@ -1078,6 +1086,10 @@
       listEl.innerHTML = '';
       renderCardboxPage(true);
     }
+
+    const selectAllCb = document.getElementById('cardboxSelectAll');
+    if (selectAllCb) selectAllCb.checked = box.length > 0 && cardboxRenderState.selected.size === box.length;
+    updateCardboxSelectedCount();
 
     const studyCountInput = document.getElementById('studyCount');
     studyCountInput.max = Math.max(1, box.length);
@@ -1095,12 +1107,14 @@
   // Cardbox list is paginated like the Word Browser (PAGE_SIZE per page) and
   // uses a single delegated click listener instead of one per row, so large
   // cardboxes (hundreds/thousands of cards) don't lag the UI.
-  const cardboxRenderState = { sorted: [], shown: 0 };
+  const cardboxRenderState = { sorted: [], shown: 0, selected: new Set() };
 
   function cardboxRowHTML(c, now) {
     const isDue = (c.due || 0) <= now;
+    const checked = cardboxRenderState.selected.has(c.word) ? ' checked' : '';
     return (
       '<div class="card-row">' +
+        '<label class="card-row-select"><input type="checkbox" class="cardbox-check" data-word="' + c.word + '"' + checked + '></label>' +
         '<div>' + tileRowHTML(c.word, 'small') + '</div>' +
         '<div class="card-row-meta">' +
           (isDue ? '<span class="status-pill status-learning">⏰ ถึงกำหนด</span>' : '') +
@@ -1110,6 +1124,13 @@
         '</div>' +
       '</div>'
     );
+  }
+
+  function updateCardboxSelectedCount() {
+    const el = document.getElementById('cardboxSelectedCount');
+    if (!el) return;
+    const n = cardboxRenderState.selected.size;
+    el.textContent = (settings.lang === 'en' ? n + ' selected' : 'เลือกแล้ว ' + n + ' คำ');
   }
 
   function renderCardboxPage(reset) {
@@ -1125,7 +1146,7 @@
 
   function initCardboxList() {
     const listEl = document.getElementById('cardboxList');
-    // Single delegated listener for all remove buttons, current and future.
+    // Single delegated listener for remove buttons + select checkboxes, current and future.
     listEl.addEventListener('click', function (e) {
       const btn = e.target.closest('.remove-card-btn');
       if (!btn) return;
@@ -1136,15 +1157,58 @@
       if (row) row.remove();
       cardboxRenderState.sorted = cardboxRenderState.sorted.filter(function (c) { return c.word !== word; });
       cardboxRenderState.shown = Math.max(0, cardboxRenderState.shown - 1);
+      cardboxRenderState.selected.delete(word);
       document.getElementById('cardboxCount').textContent = loadCardbox().length;
+      updateCardboxSelectedCount();
+      const selectAllCb = document.getElementById('cardboxSelectAll');
+      if (selectAllCb) selectAllCb.checked = false;
       showToast('ลบคำออกจาก Cardbox แล้ว');
       if (!loadCardbox().length) {
         listEl.innerHTML = '<div class="empty-state">ยังไม่มีคำศัพท์ใน Cardbox — ไปที่แท็บ "แบบทดสอบ" เพื่อเลือกคำที่อยากจำ</div>';
         document.getElementById('cardboxLoadMoreWrap').style.display = 'none';
       }
     });
+
+    listEl.addEventListener('change', function (e) {
+      const cb = e.target.closest('.cardbox-check');
+      if (!cb) return;
+      const word = cb.dataset.word;
+      if (cb.checked) cardboxRenderState.selected.add(word);
+      else cardboxRenderState.selected.delete(word);
+      updateCardboxSelectedCount();
+      const selectAllCb = document.getElementById('cardboxSelectAll');
+      if (selectAllCb) {
+        selectAllCb.checked = cardboxRenderState.selected.size === loadCardbox().length && loadCardbox().length > 0;
+      }
+    });
+
     document.getElementById('cardboxLoadMoreBtn').addEventListener('click', function () {
       renderCardboxPage(false);
+    });
+
+    document.getElementById('cardboxSelectAll').addEventListener('change', function (e) {
+      const checked = e.target.checked;
+      const box = loadCardbox();
+      if (checked) {
+        box.forEach(function (c) { cardboxRenderState.selected.add(c.word); });
+      } else {
+        cardboxRenderState.selected.clear();
+      }
+      // Update checkboxes currently rendered on screen.
+      listEl.querySelectorAll('.cardbox-check').forEach(function (cb) { cb.checked = checked; });
+      updateCardboxSelectedCount();
+    });
+
+    document.getElementById('studySelectedBtn').addEventListener('click', function () {
+      const selectedWords = cardboxRenderState.selected;
+      if (!selectedWords.size) { showToast('กรุณาเลือกคำศัพท์อย่างน้อย 1 คำ'); return; }
+      const box = loadCardbox();
+      const queue = box.filter(function (c) { return selectedWords.has(c.word); });
+      if (!queue.length) { showToast('กรุณาเลือกคำศัพท์อย่างน้อย 1 คำ'); return; }
+
+      const mode = document.getElementById('studyMode').value;
+      const anagramOrder = document.getElementById('anagramOrder').value;
+      startStudySession(queue, mode, anagramOrder);
     });
   }
 
@@ -1411,8 +1475,7 @@
         tileRowHTML(letters, 'big') +
         (validGroup.length > 1 ? '<div class="anagram-found-progress" id="anagramFoundProgress">พบแล้ว 0 / ' + validGroup.length + ' คำ</div>' : '') +
         '<form class="session-answer-form" id="anagramForm">' +
-          '<input type="text" id="anagramInput" autocomplete="off" placeholder="พิมพ์คำตอบแล้วกด Enter" autofocus>' +
-          '<button class="btn btn-primary" type="submit">ตรวจคำตอบ</button>' +
+          '<input type="text" id="anagramInput" autocomplete="off" placeholder="พิมพ์คำตอบ — ตรวจให้อัตโนมัติ" autofocus>' +
         '</form>' +
         '<div class="session-controls">' +
           '<button type="button" class="btn btn-outline btn-sm" id="anagramHintBtn">💡 Hint</button>' +
@@ -1454,7 +1517,6 @@
     function finishCard() {
       input.disabled = true;
       hintBtn.disabled = true;
-      form.querySelector('button').disabled = true;
       const allCorrect = found.size === validGroup.length;
       recordAnswer(word, allCorrect, session.hintUsed);
 
@@ -1471,24 +1533,32 @@
       document.getElementById('anagramNextBtn').addEventListener('click', nextCard);
     }
 
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
+    // Live-checks whatever is currently typed, letter by letter — no Enter
+    // or submit button needed. Fires on every keystroke; a guess is only
+    // evaluated once its length matches a real candidate word, so partial
+    // typing along the way doesn't flash a false "wrong".
+    function checkTyped() {
       const guess = input.value.trim().toUpperCase();
-      if (!guess) return;
+      if (!guess) { feedback.textContent = ''; feedback.className = 'session-feedback'; return; }
 
       if (found.has(guess)) {
         feedback.textContent = 'พิมพ์คำนี้ไปแล้ว ลองคำอื่น (เหลืออีก ' + (validGroup.length - found.size) + ' คำ)';
         feedback.className = 'session-feedback wrong';
-        input.value = '';
         return;
       }
+
+      // Only judge once the guess is at least as long as the shortest
+      // remaining valid word — otherwise every keystroke along the way to
+      // a correct word would momentarily show as "wrong".
+      const minRemainingLen = Math.min.apply(null, validGroup.filter(function (w) { return !found.has(w); }).map(function (w) { return w.length; }));
+      if (guess.length < minRemainingLen) { feedback.textContent = ''; feedback.className = 'session-feedback'; return; }
 
       const isValid = validGroup.indexOf(guess) !== -1;
 
       if (isValid) {
         found.add(guess);
-        input.value = '';
         wrongStreak = false;
+        input.value = '';
 
         if (progressEl) progressEl.textContent = 'พบแล้ว ' + found.size + ' / ' + validGroup.length + ' คำ';
 
@@ -1505,15 +1575,21 @@
           (session.hintUsed ? '  (ใช้ Hint ช่วย)' : '');
         feedback.className = 'session-feedback correct';
         finishCard();
-      } else {
+      } else if (guess.length >= word.length) {
+        // Typed at least as many letters as the target word but it's not
+        // a valid answer — flag it as wrong right away.
         wrongStreak = true;
         feedback.textContent = '✗ ยังไม่ถูก ลองอีกครั้ง' +
           (found.size ? ' (พบแล้ว ' + found.size + ' / ' + validGroup.length + ' คำ)' : '');
         feedback.className = 'session-feedback wrong';
-        input.value = '';
-        input.focus();
+      } else {
+        feedback.textContent = '';
+        feedback.className = 'session-feedback';
       }
-    });
+    }
+
+    input.addEventListener('input', checkTyped);
+    form.addEventListener('submit', function (e) { e.preventDefault(); });
   }
 
   function renderRecallCard(area, word) {
@@ -1917,12 +1993,19 @@
     const sort = browseState.sort;
     if (sort === 'prob-desc' || sort === 'prob-asc') {
       const dir = sort === 'prob-desc' ? -1 : 1;
-      browseState.results.sort(function (a, b) {
-        const pa = wordProbabilityNormalizedPct(a);
-        const pb = wordProbabilityNormalizedPct(b);
-        if (pa !== pb) return (pa - pb) * dir;
-        return a < b ? -1 : (a > b ? 1 : 0);
+      // Precompute each word's probability once (Schwartzian transform)
+      // instead of recomputing it inside the comparator — on a large
+      // result set the sort makes O(n log n) comparisons, so calling
+      // wordProbabilityNormalizedPct() twice per comparison was doing
+      // millions of redundant lookups on big lists.
+      const withKey = browseState.results.map(function (w) {
+        return { w: w, p: wordProbabilityNormalizedPct(w) };
       });
+      withKey.sort(function (a, b) {
+        if (a.p !== b.p) return (a.p - b.p) * dir;
+        return a.w < b.w ? -1 : (a.w > b.w ? 1 : 0);
+      });
+      browseState.results = withKey.map(function (x) { return x.w; });
     } else {
       browseState.results.sort(function (a, b) { return a < b ? -1 : (a > b ? 1 : 0); });
     }
@@ -1932,8 +2015,14 @@
     const wrap = document.getElementById('browseResults');
     if (reset) wrap.innerHTML = '';
     const slice = browseState.results.slice(browseState.shown, browseState.shown + PAGE_SIZE);
-    wrap.insertAdjacentHTML('beforeend', slice.map(wordRowHTML).join(''));
-    bindAnagramToggles(wrap);
+    // Render only the new slice into a detached fragment and scan just that
+    // fragment for anagram-toggle buttons to bind — scanning the whole
+    // (potentially huge) container on every "Load More" click is what made
+    // paging through large result sets increasingly slow.
+    const temp = document.createElement('div');
+    temp.innerHTML = slice.map(wordRowHTML).join('');
+    bindAnagramToggles(temp);
+    while (temp.firstChild) wrap.appendChild(temp.firstChild);
     browseState.shown += slice.length;
     document.getElementById('browseLoadMoreWrap').style.display =
       browseState.shown < browseState.results.length ? '' : 'none';
