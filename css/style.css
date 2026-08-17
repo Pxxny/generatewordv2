@@ -335,6 +335,31 @@ main {
 }
 .no-anagram { color: #6f8a7d; font-style: italic; font-size: 0.82rem; }
 
+.word-hooks {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  font-size: 0.76rem;
+}
+.hook-group { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.hook-label { color: #8fae9f; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.7rem; margin-right: 0.1rem; }
+.hook-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.2rem;
+  background: var(--brass-deep);
+  color: var(--board-0);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.72rem;
+  border-radius: 4px;
+}
+.hook-back .hook-letter { background: var(--teal-deep); color: var(--cream); }
+
 #exportCapture { padding: 0.4rem; }
 
 /* ---------- quiz select list ---------- */
