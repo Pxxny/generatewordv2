@@ -254,6 +254,14 @@
       <div class="btn-row">
         <button class="btn btn-primary" id="browseSearchBtn" data-i18n="browse.search">🔍 ค้นหา (Enter)</button>
         <button class="btn btn-outline btn-sm" id="browseClearBtn" data-i18n="browse.clear">ล้างตัวกรอง</button>
+        <div class="field" style="min-width:220px;margin-bottom:0">
+          <label for="browseSortSelect" data-i18n="browse.sortLabel">เรียงลำดับ</label>
+          <select id="browseSortSelect">
+            <option value="alpha">ตัวอักษร (A-Z)</option>
+            <option value="prob-desc">Prob: มากไปน้อย</option>
+            <option value="prob-asc">Prob: น้อยไปมาก</option>
+          </select>
+        </div>
       </div>
       <p class="field-hint" id="browseResultCount"></p>
     </div>
