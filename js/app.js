@@ -13,6 +13,14 @@
     U: 1, V: 4, W: 4, X: 8, Y: 4, Z: 10
   };
 
+  // Standard 100-tile English/CSW Scrabble bag composition (2 blanks).
+  const TILE_BAG = {
+    A: 9, B: 2, C: 2, D: 4, E: 12, F: 2, G: 3, H: 2, I: 9, J: 1,
+    K: 1, L: 4, M: 2, N: 6, O: 8, P: 2, Q: 1, R: 6, S: 4, T: 6,
+    U: 4, V: 2, W: 2, X: 1, Y: 2, Z: 1, '?': 2
+  };
+  const TILE_BAG_TOTAL = 100;
+
   const CARDBOX_KEY = 'csw24_cardbox_v1';
   const CUSTOM_KEY = 'csw24_custom_words_v1';
   const SETTINGS_KEY = 'csw24_settings_v1';
@@ -359,6 +367,118 @@
     return true;
   }
 
+  // ---------- word "Probability" and "Playability" ----------
+  // Probability: chance of drawing exactly this word's letters (as a set,
+  // any order) in a single random draw of word.length tiles from the full
+  // 100-tile bag (2 blanks). This is the standard combinatorial word-study
+  // stat used by tools like Zyzzyva: (ways to draw this letter multiset,
+  // counting blanks-as-any-letter) / (total ways to draw N tiles from 100).
+  // Playability: a 0-100 relative ease score, ranking each word against all
+  // other words of the same length by that same probability (higher =
+  // easier/more likely to be drawable).
+
+  const _nCrCache = {};
+  function nCr(n, r) {
+    if (r < 0 || r > n) return 0;
+    if (r === 0 || r === n) return 1;
+    const key = n + '_' + r;
+    if (_nCrCache[key] !== undefined) return _nCrCache[key];
+    r = Math.min(r, n - r);
+    let result = 1;
+    for (let i = 0; i < r; i++) {
+      result = (result * (n - i)) / (i + 1);
+    }
+    _nCrCache[key] = result;
+    return result;
+  }
+
+  // Computes: sum over ways to cover `blanksForWord` letter-instances (from
+  // `counts`) with blanks, of [ product over letters of C(bagCount[ch], directCopiesNeeded) ]
+  // times C(remaining blanks, 0..) handled by caller for extra/filler tiles.
+  // For simplicity and correctness at rack sizes actually used (<=15, mostly <=7),
+  // we do a direct recursive allocation over the (small) set of distinct letters.
+  function distributeBlanksWays(counts, blanksForWord) {
+    const letters = Object.keys(counts);
+    let totalWays = 0;
+    function recurse(i, blanksLeft, product) {
+      if (i === letters.length) {
+        if (blanksLeft === 0) totalWays += product;
+        return;
+      }
+      const ch = letters[i];
+      const need = counts[ch];
+      const bagHas = TILE_BAG[ch] || 0;
+      const maxBlankHere = Math.min(need, blanksLeft);
+      for (let b = 0; b <= maxBlankHere; b++) {
+        const directNeeded = need - b;
+        const ways = nCr(bagHas, directNeeded);
+        if (ways === 0 && directNeeded > 0) continue;
+        recurse(i + 1, blanksLeft - b, product * ways);
+      }
+    }
+    recurse(0, blanksForWord, 1);
+    return totalWays;
+  }
+
+  const _wordProbCache = {};
+  // Returns probability (0-1) of drawing this word's letters in a random
+  // draw of word.length tiles from the 100-tile bag (fillers can be anything).
+  function wordDrawProbability(word) {
+    if (_wordProbCache[word] !== undefined) return _wordProbCache[word];
+    const n = word.length;
+    if (n < 1 || n > TILE_BAG_TOTAL) { _wordProbCache[word] = 0; return 0; }
+    const counts = letterCounts(word);
+    const need = n; // total letters needed = word length (no repeats beyond counts)
+    const blanksAvail = TILE_BAG['?'];
+    let favorable = 0;
+    // For each number of blanks used to cover word letters (0..min(need,2)):
+    for (let blanksForWord = 0; blanksForWord <= Math.min(need, blanksAvail); blanksForWord++) {
+      const allocateWays = distributeBlanksWays(counts, blanksForWord);
+      if (allocateWays === 0) continue;
+      // Ways to choose *which* physical blank tile(s) out of the bag's 2
+      // blanks are the ones drawn (blanks are separate tiles in the bag).
+      const chooseBlankWays = nCr(blanksAvail, blanksForWord);
+      // drawSize === word.length here, so no extra filler tiles are needed.
+      favorable += allocateWays * chooseBlankWays;
+    }
+    const totalWays = nCr(TILE_BAG_TOTAL, n);
+    const prob = totalWays > 0 ? favorable / totalWays : 0;
+    _wordProbCache[word] = prob;
+    return prob;
+  }
+
+  function formatProbabilityPct(p) {
+    if (p <= 0) return '0%';
+    if (p >= 0.01) return (p * 100).toFixed(2) + '%';
+    if (p >= 0.0001) return (p * 100).toFixed(4) + '%';
+    return (p * 100).toExponential(2) + '%';
+  }
+
+  // Playability: percentile rank (0-100) of this word's draw probability
+  // among all CSW24 words of the same length. Higher = relatively easier
+  // to draw/play than other words of that length. Cached per length.
+  const _playabilityRankCache = {};
+  function wordPlayability(word) {
+    const L = word.length;
+    if (!_playabilityRankCache[L]) {
+      const pool = (typeof lengthPool === 'function' ? lengthPool(L) : (CSW24_BY_LENGTH[L] || []));
+      const probs = pool.map(function (w) { return wordDrawProbability(w); });
+      const sorted = probs.slice().sort(function (a, b) { return a - b; });
+      _playabilityRankCache[L] = { pool: pool, sorted: sorted };
+    }
+    const sorted = _playabilityRankCache[L].sorted;
+    if (!sorted.length) return 0;
+    const p = wordDrawProbability(word);
+    // Binary search for rank position (percentile of words at or below this probability)
+    let lo = 0, hi = sorted.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (sorted[mid] < p) lo = mid + 1; else hi = mid;
+    }
+    const percentile = sorted.length > 1 ? (lo / (sorted.length - 1)) * 100 : 100;
+    return Math.round(percentile);
+  }
+
   function tileRowHTML(word, sizeClass) {
     sizeClass = sizeClass || '';
     return '<span class="tile-word">' + word.split('').map(function (ch) {
@@ -476,7 +596,8 @@
       '<div class="word-row" data-word="' + word + '">' +
         '<div class="word-row-top">' +
           '<div>' + tileRowHTML(word) + '</div>' +
-          '<div class="word-meta">' + word.length + ' ตัวอักษร · ' + wordScore(word) + ' คะแนน</div>' +
+          '<div class="word-meta">' + word.length + ' ตัวอักษร · ' + wordScore(word) + ' คะแนน · ' +
+            'Prob ' + formatProbabilityPct(wordDrawProbability(word)) + ' · Play ' + wordPlayability(word) + '</div>' +
           '<button class="anagram-toggle" data-uid="' + uid + '" data-word="' + word + '">🔤 ดู Anagram</button>' +
         '</div>' +
         '<div class="anagram-detail" id="anagram-' + uid + '"></div>' +
@@ -1929,7 +2050,8 @@
           '<input type="checkbox" class="tg-typed-check" data-word="' + word + '">' +
           '<span class="qi-index">' + (idx + 1) + '</span>' +
           tileRowHTML(word, 'small') +
-          '<span class="word-meta">' + wordScore(word) + ' pts</span>' +
+          '<span class="word-meta">' + wordScore(word) + ' pts · Prob ' +
+            formatProbabilityPct(wordDrawProbability(word)) + ' · Play ' + wordPlayability(word) + '</span>' +
         '</label>'
       );
     }).join('');
