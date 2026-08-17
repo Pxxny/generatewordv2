@@ -447,26 +447,24 @@
     return prob;
   }
 
-  function formatProbabilityPct(p) {
-    if (p <= 0) return '0%';
-    if (p >= 0.01) return (p * 100).toFixed(2) + '%';
-    if (p >= 0.0001) return (p * 100).toFixed(4) + '%';
-    return (p * 100).toExponential(2) + '%';
-  }
-
   // Playability: percentile rank (0-100) of this word's draw probability
   // among all CSW24 words of the same length. Higher = relatively easier
   // to draw/play than other words of that length. Cached per length.
   const _playabilityRankCache = {};
-  function wordPlayability(word) {
-    const L = word.length;
+  function _playabilityRankData(L) {
     if (!_playabilityRankCache[L]) {
       const pool = (typeof lengthPool === 'function' ? lengthPool(L) : (CSW24_BY_LENGTH[L] || []));
       const probs = pool.map(function (w) { return wordDrawProbability(w); });
       const sorted = probs.slice().sort(function (a, b) { return a - b; });
-      _playabilityRankCache[L] = { pool: pool, sorted: sorted };
+      const max = sorted.length ? sorted[sorted.length - 1] : 0;
+      _playabilityRankCache[L] = { pool: pool, sorted: sorted, max: max };
     }
-    const sorted = _playabilityRankCache[L].sorted;
+    return _playabilityRankCache[L];
+  }
+
+  function wordPlayability(word) {
+    const data = _playabilityRankData(word.length);
+    const sorted = data.sorted;
     if (!sorted.length) return 0;
     const p = wordDrawProbability(word);
     // Binary search for rank position (percentile of words at or below this probability)
@@ -477,6 +475,16 @@
     }
     const percentile = sorted.length > 1 ? (lo / (sorted.length - 1)) * 100 : 100;
     return Math.round(percentile);
+  }
+
+  // Probability normalized against the easiest-to-draw word of the same
+  // length (that word = 100%), so the displayed number is always a
+  // readable 0-100% instead of a tiny fraction like 0.0035%.
+  function wordProbabilityNormalizedPct(word) {
+    const data = _playabilityRankData(word.length);
+    if (!data.max) return 0;
+    const p = wordDrawProbability(word);
+    return Math.round((p / data.max) * 100);
   }
 
   function tileRowHTML(word, sizeClass) {
@@ -597,7 +605,7 @@
         '<div class="word-row-top">' +
           '<div>' + tileRowHTML(word) + '</div>' +
           '<div class="word-meta">' + word.length + ' ตัวอักษร · ' + wordScore(word) + ' คะแนน · ' +
-            'Prob ' + formatProbabilityPct(wordDrawProbability(word)) + ' · Play ' + wordPlayability(word) + '</div>' +
+            'Prob ' + wordProbabilityNormalizedPct(word) + '% · Play ' + wordPlayability(word) + '</div>' +
           '<button class="anagram-toggle" data-uid="' + uid + '" data-word="' + word + '">🔤 ดู Anagram</button>' +
         '</div>' +
         '<div class="anagram-detail" id="anagram-' + uid + '"></div>' +
@@ -654,16 +662,20 @@
 
   // ---------- cardbox storage + spaced repetition ----------
 
+  let _cardboxCache = null;
   function loadCardbox() {
+    if (_cardboxCache) return _cardboxCache;
     try {
       const raw = localStorage.getItem(CARDBOX_KEY);
-      return raw ? JSON.parse(raw) : [];
+      _cardboxCache = raw ? JSON.parse(raw) : [];
     } catch (e) {
-      return [];
+      _cardboxCache = [];
     }
+    return _cardboxCache;
   }
 
   function saveCardbox(list) {
+    _cardboxCache = list;
     localStorage.setItem(CARDBOX_KEY, JSON.stringify(list));
   }
 
@@ -956,33 +968,17 @@
     document.getElementById('cardboxDueCount').textContent =
       box.length ? dueCount + ' คำถึงกำหนดทบทวนตอนนี้' : '';
 
-    const listEl = document.getElementById('cardboxList');
+    // Sort once, cache the sorted list + reset pagination to the top.
+    cardboxRenderState.sorted = box.slice().sort(function (a, b) { return b.addedAt - a.addedAt; });
+    cardboxRenderState.shown = 0;
 
+    const listEl = document.getElementById('cardboxList');
     if (!box.length) {
       listEl.innerHTML = '<div class="empty-state">ยังไม่มีคำศัพท์ใน Cardbox — ไปที่แท็บ "แบบทดสอบ" เพื่อเลือกคำที่อยากจำ</div>';
+      document.getElementById('cardboxLoadMoreWrap').style.display = 'none';
     } else {
-      listEl.innerHTML = box.slice().sort(function (a, b) { return b.addedAt - a.addedAt; }).map(function (c) {
-        const isDue = (c.due || 0) <= now;
-        return (
-          '<div class="card-row">' +
-            '<div>' + tileRowHTML(c.word, 'small') + '</div>' +
-            '<div class="card-row-meta">' +
-              (isDue ? '<span class="status-pill status-learning">⏰ ถึงกำหนด</span>' : '') +
-              '<span class="status-pill status-' + c.status + '">' + statusLabel(c.status) + '</span>' +
-              '<span>✓' + c.correct + ' ✗' + c.incorrect + '</span>' +
-              '<button class="remove-card-btn" data-word="' + c.word + '" title="ลบออกจาก Cardbox">✕</button>' +
-            '</div>' +
-          '</div>'
-        );
-      }).join('');
-
-      listEl.querySelectorAll('.remove-card-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          removeFromCardbox(btn.dataset.word);
-          renderCardboxTab();
-          showToast('ลบคำออกจาก Cardbox แล้ว');
-        });
-      });
+      listEl.innerHTML = '';
+      renderCardboxPage(true);
     }
 
     const studyCountInput = document.getElementById('studyCount');
@@ -996,6 +992,62 @@
       minLenInput.value = Math.min.apply(null, lens);
       maxLenInput.value = Math.max.apply(null, lens);
     }
+  }
+
+  // Cardbox list is paginated like the Word Browser (PAGE_SIZE per page) and
+  // uses a single delegated click listener instead of one per row, so large
+  // cardboxes (hundreds/thousands of cards) don't lag the UI.
+  const cardboxRenderState = { sorted: [], shown: 0 };
+
+  function cardboxRowHTML(c, now) {
+    const isDue = (c.due || 0) <= now;
+    return (
+      '<div class="card-row">' +
+        '<div>' + tileRowHTML(c.word, 'small') + '</div>' +
+        '<div class="card-row-meta">' +
+          (isDue ? '<span class="status-pill status-learning">⏰ ถึงกำหนด</span>' : '') +
+          '<span class="status-pill status-' + c.status + '">' + statusLabel(c.status) + '</span>' +
+          '<span>✓' + c.correct + ' ✗' + c.incorrect + '</span>' +
+          '<button class="remove-card-btn" data-word="' + c.word + '" title="ลบออกจาก Cardbox">✕</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderCardboxPage(reset) {
+    const listEl = document.getElementById('cardboxList');
+    if (reset) listEl.innerHTML = '';
+    const now = Date.now();
+    const slice = cardboxRenderState.sorted.slice(cardboxRenderState.shown, cardboxRenderState.shown + PAGE_SIZE);
+    listEl.insertAdjacentHTML('beforeend', slice.map(function (c) { return cardboxRowHTML(c, now); }).join(''));
+    cardboxRenderState.shown += slice.length;
+    document.getElementById('cardboxLoadMoreWrap').style.display =
+      cardboxRenderState.shown < cardboxRenderState.sorted.length ? '' : 'none';
+  }
+
+  function initCardboxList() {
+    const listEl = document.getElementById('cardboxList');
+    // Single delegated listener for all remove buttons, current and future.
+    listEl.addEventListener('click', function (e) {
+      const btn = e.target.closest('.remove-card-btn');
+      if (!btn) return;
+      const word = btn.dataset.word;
+      removeFromCardbox(word);
+      // Remove just this row + update in-memory sorted list, instead of a full re-render.
+      const row = btn.closest('.card-row');
+      if (row) row.remove();
+      cardboxRenderState.sorted = cardboxRenderState.sorted.filter(function (c) { return c.word !== word; });
+      cardboxRenderState.shown = Math.max(0, cardboxRenderState.shown - 1);
+      document.getElementById('cardboxCount').textContent = loadCardbox().length;
+      showToast('ลบคำออกจาก Cardbox แล้ว');
+      if (!loadCardbox().length) {
+        listEl.innerHTML = '<div class="empty-state">ยังไม่มีคำศัพท์ใน Cardbox — ไปที่แท็บ "แบบทดสอบ" เพื่อเลือกคำที่อยากจำ</div>';
+        document.getElementById('cardboxLoadMoreWrap').style.display = 'none';
+      }
+    });
+    document.getElementById('cardboxLoadMoreBtn').addEventListener('click', function () {
+      renderCardboxPage(false);
+    });
   }
 
   function initCardboxTab() {
@@ -2051,7 +2103,7 @@
           '<span class="qi-index">' + (idx + 1) + '</span>' +
           tileRowHTML(word, 'small') +
           '<span class="word-meta">' + wordScore(word) + ' pts · Prob ' +
-            formatProbabilityPct(wordDrawProbability(word)) + ' · Play ' + wordPlayability(word) + '</span>' +
+            wordProbabilityNormalizedPct(word) + '% · Play ' + wordPlayability(word) + '</span>' +
         '</label>'
       );
     }).join('');
@@ -2746,6 +2798,7 @@
     initGenerator();
     initQuizTab();
     initCardboxTab();
+    initCardboxList();
     initDueTimeControls();
     initImportExport();
     initCardboxImportExport();
