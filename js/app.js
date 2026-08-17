@@ -47,7 +47,7 @@
       'quiz.sub': 'สุ่มคำศัพท์ชุดใหม่ (ค่าเริ่มต้น 50 คำ) เลือกคำที่ถูกใจอยากจำ แล้วกด Save to Cardbox เพื่อเก็บไว้ทบทวน',
       'cardbox.title': 'การ์ดของฉัน (Cardbox)', 'cardbox.studyMode': 'รูปแบบ Quiz',
       'cardbox.anagramOrder': 'การเรียงตัวอักษร', 'cardbox.studyCount': 'จำนวนคำที่ทบทวน', 'cardbox.start': '▶ เริ่มทบทวน',
-      'browse.title': 'คลังคำศัพท์ทั้งหมด', 'browse.search': '🔍 ค้นหา (Enter)', 'browse.clear': 'ล้างตัวกรอง',
+      'browse.title': 'คลังคำศัพท์ทั้งหมด', 'browse.search': '🔍 ค้นหา (Enter)', 'browse.clear': 'ล้างตัวกรอง', 'browse.sortLabel': 'เรียงลำดับ',
       'mini.title': '🕹️ Minigame', 'mini.typing': '⌨️ พิมพ์ศัพท์ Random', 'mini.racks': '🁢 Random Racks',
       'mini.alpha': '🔀 Alphagram Blitz', 'mini.marathon': '⚡ Time Attack Marathon',
       'mini.startGame': '▶ เริ่มเกม', 'mini.newRack': '▶ สุ่ม Rack ใหม่',
@@ -81,7 +81,7 @@
       'quiz.sub': 'Randomize a fresh batch (default 50), select the words you want to learn, then Save to Cardbox.',
       'cardbox.title': 'My Cards (Cardbox)', 'cardbox.studyMode': 'Study mode',
       'cardbox.anagramOrder': 'Letter order', 'cardbox.studyCount': 'Words to review', 'cardbox.start': '▶ Start review',
-      'browse.title': 'Full word dictionary', 'browse.search': '🔍 Search (Enter)', 'browse.clear': 'Clear filters',
+      'browse.title': 'Full word dictionary', 'browse.search': '🔍 Search (Enter)', 'browse.clear': 'Clear filters', 'browse.sortLabel': 'Sort by',
       'mini.title': '🕹️ Minigame', 'mini.typing': '⌨️ Random Word Typing', 'mini.racks': '🁢 Random Racks',
       'mini.alpha': '🔀 Alphagram Blitz', 'mini.marathon': '⚡ Time Attack Marathon',
       'mini.startGame': '▶ Start game', 'mini.newRack': '▶ New rack',
@@ -487,8 +487,19 @@
     return Math.round((p / data.max) * 100);
   }
 
+  // For "big" tiles, longer words need a smaller tile size or they can't
+  // realistically fit/wrap on a phone screen (a 15-letter word at full size
+  // is wider than most viewports). This only kicks in for the big size,
+  // since small/rack tiles are already compact.
+  function lengthTileSizeClass(sizeClass, length) {
+    if (sizeClass !== 'big') return sizeClass;
+    if (length >= 13) return 'big longer-word';
+    if (length >= 10) return 'big long-word';
+    return sizeClass;
+  }
+
   function tileRowHTML(word, sizeClass) {
-    sizeClass = sizeClass || '';
+    sizeClass = lengthTileSizeClass(sizeClass || '', word.length);
     return '<span class="tile-word">' + word.split('').map(function (ch) {
       return '<span class="letter-tile ' + sizeClass + '">' + ch +
         '<span class="pv">' + (SCRABBLE_VALUES[ch] || '') + '</span></span>';
@@ -496,7 +507,7 @@
   }
 
   function blankTileRowHTML(length, sizeClass) {
-    sizeClass = sizeClass || '';
+    sizeClass = lengthTileSizeClass(sizeClass || '', length);
     let out = '<span class="tile-word">';
     for (let i = 0; i < length; i++) {
       out += '<span class="letter-tile blank ' + sizeClass + '">&nbsp;</span>';
@@ -1296,10 +1307,21 @@
   function renderAnagramCard(area, word) {
     const letters = session.anagramOrder === 'alpha' ? sortLetters(word) : shuffle(word.split('')).join('');
     session.hintLevel = 0;
+
+    // A scrambled rack of letters can legitimately spell more than one
+    // dictionary word (e.g. EGL -> LEG or GEL). When that happens, the
+    // learner must find every one of them before moving on.
+    const validGroup = [word].concat(getAnagrams(word));
+    const found = new Set();
+    let wrongStreak = false;
+
     area.innerHTML =
       '<div class="session-card">' +
-        '<div class="session-prompt-label">Anagram · เรียงตัวอักษรให้เป็นคำศัพท์</div>' +
+        '<div class="session-prompt-label">Anagram · เรียงตัวอักษรให้เป็นคำศัพท์' +
+          (validGroup.length > 1 ? ' (มี ' + validGroup.length + ' คำตอบ ต้องหาให้ครบ)' : '') +
+        '</div>' +
         tileRowHTML(letters, 'big') +
+        (validGroup.length > 1 ? '<div class="anagram-found-progress" id="anagramFoundProgress">พบแล้ว 0 / ' + validGroup.length + ' คำ</div>' : '') +
         '<form class="session-answer-form" id="anagramForm">' +
           '<input type="text" id="anagramInput" autocomplete="off" placeholder="พิมพ์คำตอบแล้วกด Enter" autofocus>' +
           '<button class="btn btn-primary" type="submit">ตรวจคำตอบ</button>' +
@@ -1315,9 +1337,11 @@
       '</div>';
 
     const form = document.getElementById('anagramForm');
+    const input = document.getElementById('anagramInput');
     const feedback = document.getElementById('anagramFeedback');
     const hintBtn = document.getElementById('anagramHintBtn');
     const hintText = document.getElementById('anagramHintText');
+    const progressEl = document.getElementById('anagramFoundProgress');
 
     hintBtn.addEventListener('click', function () {
       // Reveal one more letter each click, up to word.length - 1 so the
@@ -1339,32 +1363,58 @@
       }
     });
 
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      const input = document.getElementById('anagramInput');
-      const guess = input.value.trim().toUpperCase();
-      if (!guess) return;
-
-      // A scrambled rack of letters can legitimately spell more than one
-      // dictionary word (e.g. EGL -> LEG or GEL) — any of them counts.
-      const validGroup = [word].concat(getAnagrams(word));
-      const isCorrect = validGroup.indexOf(guess) !== -1;
-
+    function finishCard() {
       input.disabled = true;
       hintBtn.disabled = true;
       form.querySelector('button').disabled = true;
-      if (isCorrect) {
-        feedback.textContent = '✓ ถูกต้อง! ' + guess +
-          (session.hintUsed ? '  (ใช้ Hint ช่วย)' : '') +
-          (validGroup.length > 1 ? '  (คำอื่นที่เป็นไปได้เช่นกัน: ' + validGroup.filter(function (w) { return w !== guess; }).join(', ') + ')' : '');
-        feedback.className = 'session-feedback correct';
-      } else {
-        feedback.textContent = '✗ ยังไม่ถูก — คำตอบที่เป็นไปได้: ' + validGroup.join(', ');
-        feedback.className = 'session-feedback wrong';
-      }
-      recordAnswer(word, isCorrect, session.hintUsed);
+      const allCorrect = found.size === validGroup.length;
+      recordAnswer(word, allCorrect, session.hintUsed);
       document.getElementById('anagramNextWrap').style.display = '';
       document.getElementById('anagramNextBtn').addEventListener('click', nextCard);
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const guess = input.value.trim().toUpperCase();
+      if (!guess) return;
+
+      if (found.has(guess)) {
+        feedback.textContent = 'พิมพ์คำนี้ไปแล้ว ลองคำอื่น (เหลืออีก ' + (validGroup.length - found.size) + ' คำ)';
+        feedback.className = 'session-feedback wrong';
+        input.value = '';
+        return;
+      }
+
+      const isValid = validGroup.indexOf(guess) !== -1;
+
+      if (isValid) {
+        found.add(guess);
+        input.value = '';
+        wrongStreak = false;
+
+        if (progressEl) progressEl.textContent = 'พบแล้ว ' + found.size + ' / ' + validGroup.length + ' คำ';
+
+        if (found.size < validGroup.length) {
+          // Still missing at least one valid word — keep the input open
+          // and do not allow moving to the next card yet.
+          feedback.textContent = '✓ ถูกต้อง! ' + guess + ' — หาคำที่เหลืออีก ' + (validGroup.length - found.size) + ' คำ';
+          feedback.className = 'session-feedback correct';
+          input.focus();
+          return;
+        }
+
+        feedback.textContent = '✓ ถูกต้องครบทุกคำ! ' + Array.from(found).join(', ') +
+          (session.hintUsed ? '  (ใช้ Hint ช่วย)' : '');
+        feedback.className = 'session-feedback correct';
+        finishCard();
+      } else {
+        wrongStreak = true;
+        feedback.textContent = '✗ ยังไม่ถูก ลองอีกครั้ง' +
+          (found.size ? ' (พบแล้ว ' + found.size + ' / ' + validGroup.length + ' คำ)' : '');
+        feedback.className = 'session-feedback wrong';
+        input.value = '';
+        input.focus();
+      }
     });
   }
 
@@ -1608,7 +1658,7 @@
 
   // ---------- Word browser tab ----------
 
-  const browseState = { activeLength: 'all', results: [], shown: 0 };
+  const browseState = { activeLength: 'all', results: [], shown: 0, sort: 'alpha' };
 
   const BROWSE_FILTER_IDS = [
     'filterStarts', 'filterEnds', 'filterContains', 'filterContainsAll',
@@ -1655,6 +1705,12 @@
       runBrowseSearch();
     });
     document.getElementById('browseLoadMoreBtn').addEventListener('click', function () { renderBrowseResults(false); });
+    document.getElementById('browseSortSelect').addEventListener('change', function (e) {
+      browseState.sort = e.target.value;
+      applyBrowseSort();
+      browseState.shown = 0;
+      renderBrowseResults(true);
+    });
   }
 
   const VOWELS = { A: 1, E: 1, I: 1, O: 1, U: 1 };
@@ -1747,9 +1803,31 @@
     const results = hasFilters ? candidates.filter(function (w) { return wordMatchesFilters(w, f); }) : candidates;
     browseState.results = results;
     browseState.shown = 0;
+    applyBrowseSort();
 
     document.getElementById('browseResultCount').textContent = 'พบ ' + results.length.toLocaleString('en-US') + ' คำ';
     renderBrowseResults(true);
+  }
+
+  // Sorts browseState.results in place according to browseState.sort.
+  // "alpha" keeps the natural dictionary order words were gathered in
+  // (already alphabetical per length bucket). The Prob sorts use each
+  // word's normalized draw-probability percentile (see wordPlayability /
+  // wordProbabilityNormalizedPct above) so mixed-length result sets still
+  // compare fairly across different word lengths.
+  function applyBrowseSort() {
+    const sort = browseState.sort;
+    if (sort === 'prob-desc' || sort === 'prob-asc') {
+      const dir = sort === 'prob-desc' ? -1 : 1;
+      browseState.results.sort(function (a, b) {
+        const pa = wordProbabilityNormalizedPct(a);
+        const pb = wordProbabilityNormalizedPct(b);
+        if (pa !== pb) return (pa - pb) * dir;
+        return a < b ? -1 : (a > b ? 1 : 0);
+      });
+    } else {
+      browseState.results.sort(function (a, b) { return a < b ? -1 : (a > b ? 1 : 0); });
+    }
   }
 
   function renderBrowseResults(reset) {
@@ -1991,7 +2069,7 @@
       '<div class="session-card">' +
         '<div class="session-prompt-label">พิมพ์คำนี้ให้ตรงทุกตัวอักษร' + (tg.strict ? ' · โหมดเข้มงวด: พิมพ์ผิด = เริ่มใหม่' : '') + '</div>' +
         '<div class="tile-word" id="tgTargetTiles">' + word.split('').map(function (ch) {
-          return '<span class="letter-tile big type-letter">' + ch + '</span>';
+          return '<span class="letter-tile ' + lengthTileSizeClass('big', word.length) + ' type-letter">' + ch + '</span>';
         }).join('') + '</div>' +
         '<input type="text" id="tgInput" class="session-answer-form-input" autocomplete="off" autofocus>' +
         (tg.showAnagram ?
