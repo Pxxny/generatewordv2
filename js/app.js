@@ -64,7 +64,13 @@
       'settings.importExport': 'นำเข้า / ส่งออกข้อมูล',
       'settings.importExportSub': 'สำรองความคืบหน้าไว้เป็นไฟล์ หรือเพิ่มคำศัพท์ของคุณเองเข้าไปใช้งานร่วมกับพจนานุกรม CSW24',
       'settings.exportProgress': '⬇ ส่งออกความคืบหน้า (JSON)', 'settings.importProgress': '⬆ นำเข้าความคืบหน้า (JSON)',
-      'settings.importWords': '⬆ นำเข้ารายการคำศัพท์ของฉัน (.txt)', 'settings.includeCustom': 'รวมคำที่นำเข้าเองตอนสุ่ม/ค้นหา'
+      'settings.importWords': '⬆ นำเข้ารายการคำศัพท์ของฉัน (.txt)', 'settings.includeCustom': 'รวมคำที่นำเข้าเองตอนสุ่ม/ค้นหา',
+      'settings.studySession': 'เซสชันทบทวน (Cardbox)',
+      'settings.studySessionSub': 'ปรับพฤติกรรมระหว่างทำ Quiz ในเซสชันทบทวน',
+      'settings.autoAdvance': 'ไปคำต่อไปอัตโนมัติเมื่อตอบถูกครบ',
+      'settings.autoAdvanceHint': 'เมื่อเปิด: หลังตอบถูกครบทุกคำ ระบบจะไปคำถัดไปให้เองโดยไม่ต้องกด Enter ซ้ำ',
+      'settings.showHooks': 'แสดง Hook (Front/Back) ของคำ',
+      'settings.showHooksHint': 'เมื่อเปิด: ทุกที่ที่แสดงคำศัพท์จะโชว์ตัวอักษรที่เติมหน้า/หลังคำแล้วได้เป็นคำใหม่ทันที'
     },
     en: {
       'tab.dashboard': '📊 Dashboard', 'tab.generate': '📝 Generate', 'tab.quiz': '🎯 Quiz',
@@ -98,7 +104,13 @@
       'settings.importExport': 'Import / Export data',
       'settings.importExportSub': 'Back up your progress to a file, or add your own words to use alongside the CSW24 dictionary.',
       'settings.exportProgress': '⬇ Export progress (JSON)', 'settings.importProgress': '⬆ Import progress (JSON)',
-      'settings.importWords': '⬆ Import my word list (.txt)', 'settings.includeCustom': 'Include imported words in randomize/search'
+      'settings.importWords': '⬆ Import my word list (.txt)', 'settings.includeCustom': 'Include imported words in randomize/search',
+      'settings.studySession': 'Study session (Cardbox)',
+      'settings.studySessionSub': 'Adjust behavior while taking Quizzes in a review session.',
+      'settings.autoAdvance': 'Auto-advance to next word once fully correct',
+      'settings.autoAdvanceHint': 'When on: after all required words are found, the app moves to the next card automatically without needing another Enter press.',
+      'settings.showHooks': 'Show word hooks (front/back)',
+      'settings.showHooksHint': 'When on: everywhere a word is shown, letters that extend it into a new word (front or back) are displayed right away.'
     }
   };
 
@@ -117,7 +129,9 @@
     dashMin: 5, dashMax: 9, dashCount: 12,
     dueTimePreset: '24h', // 1h,5h,12h,24h,1d,2d,5d,10d,30d,custom
     dueTimeCustomValue: 3, dueTimeCustomUnit: 'd',
-    fontFamily: 'inter', fontScale: 1
+    fontFamily: 'inter', fontScale: 1,
+    autoAdvance: true, autoAdvanceDelay: 900,
+    showHooks: true
   };
 
   function loadSettings() {
@@ -339,6 +353,26 @@
         saveSettings();
       });
     });
+
+    // auto-advance toggle for Cardbox study sessions
+    const autoAdvanceToggle = document.getElementById('autoAdvanceToggle');
+    autoAdvanceToggle.checked = !!settings.autoAdvance;
+    autoAdvanceToggle.addEventListener('change', function () {
+      settings.autoAdvance = autoAdvanceToggle.checked;
+      saveSettings();
+    });
+
+    // show-hooks toggle (front/back hooks displayed inline wherever a word shows)
+    const showHooksToggle = document.getElementById('showHooksToggle');
+    showHooksToggle.checked = settings.showHooks !== false;
+    showHooksToggle.addEventListener('change', function () {
+      settings.showHooks = showHooksToggle.checked;
+      saveSettings();
+      // re-render whichever view is currently open so the change is visible
+      // immediately without requiring navigation.
+      if (document.getElementById('tab-dashboard').classList.contains('active')) renderDashboard();
+      if (document.getElementById('tab-cardbox').classList.contains('active')) renderCardboxTab();
+    });
   }
 
   // ---------- generic helpers ----------
@@ -365,6 +399,36 @@
       if ((rackCounts[ch] || 0) < wc[ch]) return false;
     }
     return true;
+  }
+
+  // ---------- Hooks (front/back single-letter extensions) ----------
+  // A "hook" is a single letter that, added to the front or back of a word,
+  // forms another valid dictionary word of length+1. E.g. AA -> BAA (front
+  // hook B) or AAL (back hook L). We cache a Set per word-length so repeated
+  // hook lookups (26 letters x 2 sides, for every word shown) stay O(1) each
+  // instead of re-scanning the whole length-pool per check.
+  const _lengthSetCache = {};
+  function lengthSet(L) {
+    const cacheKey = L + (includeCustomEnabled() ? ':custom' : '');
+    if (_lengthSetCache[cacheKey]) return _lengthSetCache[cacheKey];
+    const pool = lengthPool(L);
+    const set = new Set(pool);
+    _lengthSetCache[cacheKey] = set;
+    return set;
+  }
+
+  function getHooks(word) {
+    const front = [];
+    const back = [];
+    const longerSet = lengthSet(word.length + 1);
+    if (longerSet.size) {
+      for (let c = 65; c <= 90; c++) {
+        const letter = String.fromCharCode(c);
+        if (longerSet.has(letter + word)) front.push(letter);
+        if (longerSet.has(word + letter)) back.push(letter);
+      }
+    }
+    return { front: front, back: back };
   }
 
   // ---------- word "Probability" and "Playability" ----------
@@ -548,6 +612,9 @@
     customWords.forEach(function (w) {
       (customByLength[w.length] = customByLength[w.length] || []).push(w);
     });
+    // custom words changed the length pools, so any cached hook/anagram
+    // length-sets built from the old pools are now stale.
+    for (const k in _lengthSetCache) delete _lengthSetCache[k];
   }
 
   function includeCustomEnabled() {
@@ -608,6 +675,25 @@
 
   // ---------- shared word-row + anagram toggle rendering ----------
 
+  function hookSummaryHTML(word) {
+    if (!settings.showHooks) return '';
+    const hooks = getHooks(word);
+    if (!hooks.front.length && !hooks.back.length) return '';
+    let html = '<div class="word-hooks">';
+    if (hooks.front.length) {
+      html += '<span class="hook-group hook-front"><span class="hook-label">Front:</span>' +
+        hooks.front.map(function (l) { return '<span class="hook-letter">' + l + '</span>'; }).join('') +
+        '</span>';
+    }
+    if (hooks.back.length) {
+      html += '<span class="hook-group hook-back"><span class="hook-label">Back:</span>' +
+        hooks.back.map(function (l) { return '<span class="hook-letter">' + l + '</span>'; }).join('') +
+        '</span>';
+    }
+    html += '</div>';
+    return html;
+  }
+
   function wordRowHTML(word) {
     uidCounter++;
     const uid = uidCounter;
@@ -617,6 +703,7 @@
           '<div>' + tileRowHTML(word) + '</div>' +
           '<div class="word-meta">' + word.length + ' ตัวอักษร · ' + wordScore(word) + ' คะแนน · ' +
             'Prob ' + wordProbabilityNormalizedPct(word) + '% · Play ' + wordPlayability(word) + '</div>' +
+          hookSummaryHTML(word) +
           '<button class="anagram-toggle" data-uid="' + uid + '" data-word="' + word + '">🔤 ดู Anagram</button>' +
         '</div>' +
         '<div class="anagram-detail" id="anagram-' + uid + '"></div>' +
@@ -1294,6 +1381,7 @@
           '<div class="session-prompt-label">คำตอบ · Enter = จำได้ · Backspace = ยังไม่รู้</div>' +
           tileRowHTML(word, 'big') +
           '<div class="word-meta">' + wordScore(word) + ' คะแนน' + (partners.length ? ' · Anagram: ' + partners.join(', ') : '') + '</div>' +
+          hookSummaryHTML(word) +
           '<div class="session-controls">' +
             '<button class="btn btn-outline" id="dontKnowBtn">✗ ยังไม่รู้</button>' +
             '<button class="btn btn-teal" id="knowBtn">✓ จำได้</button>' +
@@ -1369,6 +1457,16 @@
       form.querySelector('button').disabled = true;
       const allCorrect = found.size === validGroup.length;
       recordAnswer(word, allCorrect, session.hintUsed);
+
+      if (settings.autoAdvance && allCorrect) {
+        // Auto-advance: skip the manual "Next" button/Enter entirely and
+        // move on after a short pause so the learner still sees the
+        // "all correct" feedback before the card changes.
+        feedback.textContent += '  ⏳';
+        setTimeout(nextCard, settings.autoAdvanceDelay || 900);
+        return;
+      }
+
       document.getElementById('anagramNextWrap').style.display = '';
       document.getElementById('anagramNextBtn').addEventListener('click', nextCard);
     }
