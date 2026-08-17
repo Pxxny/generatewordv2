@@ -147,6 +147,13 @@
       </div>
 
       <p style="margin-top:0.6rem"><strong id="cardboxCount">0</strong> คำใน Cardbox · <span id="cardboxDueCount" class="field-hint"></span></p>
+
+      <div class="btn-row" id="cardboxSelectRow" style="align-items:center">
+        <label class="checkbox-field"><input type="checkbox" id="cardboxSelectAll"> <span data-i18n="common.selectAll">เลือกทั้งหมด</span></label>
+        <span class="selected-count" id="cardboxSelectedCount" data-i18n="cardbox.selectedCount">เลือกแล้ว 0 คำ</span>
+        <button class="btn btn-primary" id="studySelectedBtn" data-i18n="cardbox.studySelected">▶ ทบทวนคำที่เลือก</button>
+      </div>
+
       <div id="cardboxList"></div>
       <div class="btn-row" id="cardboxLoadMoreWrap" style="display:none">
         <button class="btn btn-outline" id="cardboxLoadMoreBtn">โหลดเพิ่ม</button>
