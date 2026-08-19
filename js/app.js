@@ -709,12 +709,18 @@
     return html;
   }
 
-  function wordRowHTML(word, showCheckbox) {
+  // `selection` lets different tabs (Word Browser, Generate, Dashboard) each
+  // keep their own independently-checked Set of words while sharing the same
+  // row markup/behavior. `checkClass` distinguishes each tab's checkboxes so
+  // their change-listeners don't pick up checkboxes belonging to another tab.
+  function wordRowHTML(word, showCheckbox, selection, checkClass) {
     uidCounter++;
     const uid = uidCounter;
+    const sel = selection || browseState.selected;
+    const cls = checkClass || 'browse-check';
     const checkboxHTML = showCheckbox
-      ? '<label class="card-row-select"><input type="checkbox" class="browse-check" data-word="' + word + '"' +
-        (browseState.selected.has(word) ? ' checked' : '') + '></label>'
+      ? '<label class="card-row-select"><input type="checkbox" class="' + cls + '" data-word="' + word + '"' +
+        (sel.has(word) ? ' checked' : '') + '></label>'
       : '';
     return (
       '<div class="word-row" data-word="' + word + '">' +
@@ -732,7 +738,7 @@
   }
 
   function browseWordRowHTML(word) {
-    return wordRowHTML(word, true);
+    return wordRowHTML(word, true, browseState.selected, 'browse-check');
   }
 
   function bindAnagramToggles(container) {
@@ -923,17 +929,31 @@
 
   // ---------- Generator tab ----------
 
-  const genState = { words: [] };
+  const genState = { words: [], selected: new Set() };
 
   function renderGenResults() {
     const wrap = document.getElementById('genResults');
-    wrap.innerHTML = genState.words.map(wordRowHTML).join('');
+    wrap.innerHTML = genState.words.map(function (word) {
+      return wordRowHTML(word, true, genState.selected, 'gen-check');
+    }).join('');
     bindAnagramToggles(wrap);
 
     let totalScore = 0;
     genState.words.forEach(function (w) { totalScore += wordScore(w); });
     document.getElementById('genSummaryLine').textContent =
       'รวม ' + genState.words.length + ' คำ · คะแนนรวม ' + totalScore + ' แต้ม';
+
+    genState.selected = new Set();
+    updateGenSelectedCount();
+    const genSelectAllCb = document.getElementById('genSelectAll');
+    if (genSelectAllCb) genSelectAllCb.checked = false;
+  }
+
+  function updateGenSelectedCount() {
+    const el = document.getElementById('genSelectedCount');
+    if (!el) return;
+    const n = genState.selected.size;
+    el.textContent = (settings.lang === 'en' ? n + ' selected' : 'เลือกแล้ว ' + n + ' คำ');
   }
 
   function initGenerator() {
@@ -961,6 +981,35 @@
     document.getElementById('exportPdfBtn').addEventListener('click', exportPDF);
     document.getElementById('exportJpgBtn').addEventListener('click', function () { exportImage('jpg'); });
     document.getElementById('exportPngBtn').addEventListener('click', function () { exportImage('png'); });
+
+    document.getElementById('genResults').addEventListener('change', function (e) {
+      const cb = e.target.closest('.gen-check');
+      if (!cb) return;
+      const word = cb.dataset.word;
+      if (cb.checked) genState.selected.add(word);
+      else genState.selected.delete(word);
+      updateGenSelectedCount();
+      const selectAllCb = document.getElementById('genSelectAll');
+      if (selectAllCb) {
+        selectAllCb.checked = genState.words.length > 0 &&
+          genState.words.every(function (w) { return genState.selected.has(w); });
+      }
+    });
+
+    document.getElementById('genSelectAll').addEventListener('change', function (e) {
+      const checked = e.target.checked;
+      if (checked) genState.words.forEach(function (w) { genState.selected.add(w); });
+      else genState.words.forEach(function (w) { genState.selected.delete(w); });
+      document.querySelectorAll('#genResults .gen-check').forEach(function (cb) { cb.checked = checked; });
+      updateGenSelectedCount();
+    });
+
+    document.getElementById('genSaveBtn').addEventListener('click', function () {
+      if (!genState.selected.size) { showToast('กรุณาเลือกคำศัพท์อย่างน้อย 1 คำ'); return; }
+      const added = addWordsToCardbox(Array.from(genState.selected));
+      showToast('บันทึกลง Cardbox แล้ว ' + added + ' คำ');
+      if (window.Achievements) window.Achievements.record('cardbox_add');
+    });
   }
 
   function downloadDataUrl(dataUrl, filename) {
@@ -1916,27 +1965,71 @@
   // ---------- Dashboard: suggested words (fixed for the page load, unless reshuffled) ----------
 
   let dashSuggestedWords = null;
+  const dashSelected = new Set();
 
   function generateDashSuggested() {
     dashSuggestedWords = pickRandomWords(settings.dashMin, settings.dashMax, settings.dashCount);
+  }
+
+  function updateDashSelectedCount() {
+    const el = document.getElementById('dashSelectedCount');
+    if (!el) return;
+    el.textContent = (settings.lang === 'en' ? dashSelected.size + ' selected' : 'เลือกแล้ว ' + dashSelected.size + ' คำ');
   }
 
   function renderDashSuggested() {
     if (!dashSuggestedWords) generateDashSuggested();
     const wrap = document.getElementById('dashSuggestedWords');
     if (!wrap) return;
+    dashSelected.clear();
+    const dashSelectAllCb = document.getElementById('dashSelectAll');
+    if (dashSelectAllCb) dashSelectAllCb.checked = false;
     if (!dashSuggestedWords.length) {
       wrap.innerHTML = '<div class="empty-state">ไม่พบคำศัพท์ในช่วงความยาวที่ตั้งไว้ — ปรับได้ที่หน้า Setting</div>';
+      updateDashSelectedCount();
       return;
     }
-    wrap.innerHTML = dashSuggestedWords.map(wordRowHTML).join('');
+    wrap.innerHTML = dashSuggestedWords.map(function (word) {
+      return wordRowHTML(word, true, dashSelected, 'dash-check');
+    }).join('');
     bindAnagramToggles(wrap);
+    updateDashSelectedCount();
   }
 
   function initDashSuggested() {
     document.getElementById('dashSuggestedRefreshBtn').addEventListener('click', function () {
       generateDashSuggested();
       renderDashSuggested();
+    });
+
+    document.getElementById('dashSuggestedWords').addEventListener('change', function (e) {
+      const cb = e.target.closest('.dash-check');
+      if (!cb) return;
+      const word = cb.dataset.word;
+      if (cb.checked) dashSelected.add(word);
+      else dashSelected.delete(word);
+      updateDashSelectedCount();
+      const selectAllCb = document.getElementById('dashSelectAll');
+      if (selectAllCb) {
+        selectAllCb.checked = (dashSuggestedWords || []).length > 0 &&
+          dashSuggestedWords.every(function (w) { return dashSelected.has(w); });
+      }
+    });
+
+    document.getElementById('dashSelectAll').addEventListener('change', function (e) {
+      const checked = e.target.checked;
+      const words = dashSuggestedWords || [];
+      if (checked) words.forEach(function (w) { dashSelected.add(w); });
+      else words.forEach(function (w) { dashSelected.delete(w); });
+      document.querySelectorAll('#dashSuggestedWords .dash-check').forEach(function (cb) { cb.checked = checked; });
+      updateDashSelectedCount();
+    });
+
+    document.getElementById('dashSaveBtn').addEventListener('click', function () {
+      if (!dashSelected.size) { showToast('กรุณาเลือกคำศัพท์อย่างน้อย 1 คำ'); return; }
+      const added = addWordsToCardbox(Array.from(dashSelected));
+      showToast('บันทึกลง Cardbox แล้ว ' + added + ' คำ');
+      if (window.Achievements) window.Achievements.record('cardbox_add');
     });
   }
 
@@ -2074,7 +2167,7 @@
 
   // ---------- Word browser tab ----------
 
-  const browseState = { activeLength: 'all', results: [], shown: 0, sort: 'alpha', selected: new Set() };
+  const browseState = { activeLength: 'all', results: [], shown: 0, sort: 'alpha', selected: new Set(), limit: 0 };
 
   const BROWSE_FILTER_IDS = [
     'browseWordSearch',
@@ -2119,7 +2212,20 @@
     document.getElementById('browseSearchBtn').addEventListener('click', runBrowseSearch);
     document.getElementById('browseClearBtn').addEventListener('click', function () {
       BROWSE_FILTER_IDS.forEach(function (id) { document.getElementById(id).value = ''; });
+      document.getElementById('browseLimitInput').value = '0';
       runBrowseSearch();
+    });
+
+    const browseLimitEl = document.getElementById('browseLimitInput');
+    browseLimitEl.addEventListener('input', function () {
+      if (browseDebounceHandle) clearTimeout(browseDebounceHandle);
+      browseDebounceHandle = setTimeout(runBrowseSearch, 200);
+    });
+    browseLimitEl.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        if (browseDebounceHandle) clearTimeout(browseDebounceHandle);
+        runBrowseSearch();
+      }
     });
     document.getElementById('browseLoadMoreBtn').addEventListener('click', function () { renderBrowseResults(false); });
     document.getElementById('browseSortSelect').addEventListener('change', function (e) {
@@ -2266,11 +2372,27 @@
     browseState.shown = 0;
     applyBrowseSort();
 
-    document.getElementById('browseResultCount').textContent = 'พบ ' + results.length.toLocaleString('en-US') + ' คำ';
+    // Display limit: 0 (or blank/invalid) means "show all". When set, trim
+    // the sorted result set down to the first N words — this also makes
+    // "Select All" and Load More naturally respect the limit, since they
+    // both operate on browseState.results.
+    const limitRaw = parseInt(document.getElementById('browseLimitInput').value, 10);
+    const limit = (isFinite(limitRaw) && limitRaw > 0) ? limitRaw : 0;
+    browseState.limit = limit;
+    const totalMatched = browseState.results.length;
+    if (limit > 0 && browseState.results.length > limit) {
+      browseState.results = browseState.results.slice(0, limit);
+    }
+
+    document.getElementById('browseResultCount').textContent =
+      (limit > 0 && totalMatched > limit)
+        ? 'พบ ' + totalMatched.toLocaleString('en-US') + ' คำ · แสดง ' + browseState.results.length.toLocaleString('en-US') + ' คำ (จำกัดไว้)'
+        : 'พบ ' + totalMatched.toLocaleString('en-US') + ' คำ';
     renderBrowseResults(true);
     const selectAllCb = document.getElementById('browseSelectAll');
     if (selectAllCb) {
-      selectAllCb.checked = results.length > 0 && results.every(function (w) { return browseState.selected.has(w); });
+      selectAllCb.checked = browseState.results.length > 0 &&
+        browseState.results.every(function (w) { return browseState.selected.has(w); });
     }
   }
 
@@ -2282,15 +2404,16 @@
   // compare fairly across different word lengths.
   function applyBrowseSort() {
     const sort = browseState.sort;
-    if (sort === 'prob-desc' || sort === 'prob-asc') {
-      const dir = sort === 'prob-desc' ? -1 : 1;
-      // Precompute each word's probability once (Schwartzian transform)
-      // instead of recomputing it inside the comparator — on a large
-      // result set the sort makes O(n log n) comparisons, so calling
-      // wordProbabilityNormalizedPct() twice per comparison was doing
-      // millions of redundant lookups on big lists.
+    if (sort === 'prob-desc' || sort === 'prob-asc' || sort === 'play-desc' || sort === 'play-asc') {
+      const isPlay = sort === 'play-desc' || sort === 'play-asc';
+      const dir = (sort === 'prob-desc' || sort === 'play-desc') ? -1 : 1;
+      const keyFn = isPlay ? wordPlayability : wordProbabilityNormalizedPct;
+      // Precompute each word's key once (Schwartzian transform) instead of
+      // recomputing it inside the comparator — on a large result set the
+      // sort makes O(n log n) comparisons, so calling the scoring function
+      // twice per comparison was doing millions of redundant lookups.
       const withKey = browseState.results.map(function (w) {
-        return { w: w, p: wordProbabilityNormalizedPct(w) };
+        return { w: w, p: keyFn(w) };
       });
       withKey.sort(function (a, b) {
         if (a.p !== b.p) return (a.p - b.p) * dir;
