@@ -48,6 +48,11 @@
       'cardbox.title': 'การ์ดของฉัน (Cardbox)', 'cardbox.studyMode': 'รูปแบบ Quiz',
       'cardbox.anagramOrder': 'การเรียงตัวอักษร', 'cardbox.studyCount': 'จำนวนคำที่ทบทวน', 'cardbox.start': '▶ เริ่มทบทวน',
       'cardbox.selectedCount': 'เลือกแล้ว 0 คำ', 'cardbox.studySelected': '▶ ทบทวนคำที่เลือก',
+      'cardbox.searchLabel': '🔍 ค้นหาคำใน Cardbox', 'cardbox.sortLabel': 'เรียงลำดับ',
+      'cardbox.sortRecent': 'เพิ่มล่าสุดก่อน', 'cardbox.sortRoundsDesc': 'จำนวนรอบเรียน: มาก→น้อย',
+      'cardbox.sortRoundsAsc': 'จำนวนรอบเรียน: น้อย→มาก', 'cardbox.sortAlpha': 'ตัวอักษร (A→Z)',
+      'cardbox.anagramReviewStart': '📖 Anagram Review', 'cardbox.anagramReviewSelected': '📖 Anagram Review คำที่เลือก',
+      'cardbox.reviewSecondsLabel': 'วินาที', 'cardbox.reviewExit': '↩ ออกจาก Review',
       'browse.title': 'คลังคำศัพท์ทั้งหมด', 'browse.search': '🔍 ค้นหา (Enter)', 'browse.clear': 'ล้างตัวกรอง', 'browse.sortLabel': 'เรียงลำดับ',
       'browse.wordSearchLabel': '🔍 ค้นหาคำศัพท์', 'browse.selectedCount': 'เลือกแล้ว 0 คำ', 'browse.saveSelected': '💾 บันทึกที่เลือกลง Cardbox',
       'mini.title': '🕹️ Minigame', 'mini.typing': '⌨️ พิมพ์ศัพท์ Random', 'mini.racks': '🁢 Random Racks',
@@ -90,6 +95,11 @@
       'cardbox.title': 'My Cards (Cardbox)', 'cardbox.studyMode': 'Study mode',
       'cardbox.anagramOrder': 'Letter order', 'cardbox.studyCount': 'Words to review', 'cardbox.start': '▶ Start review',
       'cardbox.selectedCount': '0 selected', 'cardbox.studySelected': '▶ Study selected',
+      'cardbox.searchLabel': '🔍 Search in Cardbox', 'cardbox.sortLabel': 'Sort by',
+      'cardbox.sortRecent': 'Recently added', 'cardbox.sortRoundsDesc': 'Study rounds: high→low',
+      'cardbox.sortRoundsAsc': 'Study rounds: low→high', 'cardbox.sortAlpha': 'Alphabetical (A→Z)',
+      'cardbox.anagramReviewStart': '📖 Anagram Review', 'cardbox.anagramReviewSelected': '📖 Anagram Review selected',
+      'cardbox.reviewSecondsLabel': 'seconds', 'cardbox.reviewExit': '↩ Exit Review',
       'browse.title': 'Full word dictionary', 'browse.search': '🔍 Search (Enter)', 'browse.clear': 'Clear filters', 'browse.sortLabel': 'Sort by',
       'browse.wordSearchLabel': '🔍 Search for a word', 'browse.selectedCount': '0 selected', 'browse.saveSelected': '💾 Save selected to Cardbox',
       'mini.title': '🕹️ Minigame', 'mini.typing': '⌨️ Random Word Typing', 'mini.racks': '🁢 Random Racks',
@@ -1079,8 +1089,8 @@
     document.getElementById('cardboxDueCount').textContent =
       box.length ? dueCount + ' คำถึงกำหนดทบทวนตอนนี้' : '';
 
-    // Sort once, cache the sorted list + reset pagination to the top.
-    cardboxRenderState.sorted = box.slice().sort(function (a, b) { return b.addedAt - a.addedAt; });
+    // Filter by search query (if any) + sort by the chosen order, reset pagination to the top.
+    cardboxRenderState.sorted = cardboxFilteredSorted(box);
     cardboxRenderState.shown = 0;
 
     // Drop any selected words that no longer exist in the cardbox.
@@ -1093,13 +1103,19 @@
     if (!box.length) {
       listEl.innerHTML = '<div class="empty-state">ยังไม่มีคำศัพท์ใน Cardbox — ไปที่แท็บ "แบบทดสอบ" เพื่อเลือกคำที่อยากจำ</div>';
       document.getElementById('cardboxLoadMoreWrap').style.display = 'none';
+    } else if (!cardboxRenderState.sorted.length) {
+      listEl.innerHTML = '<div class="empty-state">ไม่พบคำที่ตรงกับคำค้นหา</div>';
+      document.getElementById('cardboxLoadMoreWrap').style.display = 'none';
     } else {
       listEl.innerHTML = '';
       renderCardboxPage(true);
     }
 
     const selectAllCb = document.getElementById('cardboxSelectAll');
-    if (selectAllCb) selectAllCb.checked = box.length > 0 && cardboxRenderState.selected.size === box.length;
+    if (selectAllCb) {
+      selectAllCb.checked = cardboxRenderState.sorted.length > 0 &&
+        cardboxRenderState.sorted.every(function (c) { return cardboxRenderState.selected.has(c.word); });
+    }
     updateCardboxSelectedCount();
 
     const studyCountInput = document.getElementById('studyCount');
@@ -1118,7 +1134,21 @@
   // Cardbox list is paginated like the Word Browser (PAGE_SIZE per page) and
   // uses a single delegated click listener instead of one per row, so large
   // cardboxes (hundreds/thousands of cards) don't lag the UI.
-  const cardboxRenderState = { sorted: [], shown: 0, selected: new Set() };
+  const cardboxRenderState = { sorted: [], shown: 0, selected: new Set(), search: '', sort: 'recent' };
+
+  function cardboxSortCompare(sort) {
+    if (sort === 'rounds-desc') return function (a, b) { return (b.correct + b.incorrect) - (a.correct + a.incorrect); };
+    if (sort === 'rounds-asc') return function (a, b) { return (a.correct + a.incorrect) - (b.correct + b.incorrect); };
+    if (sort === 'alpha') return function (a, b) { return a.word < b.word ? -1 : (a.word > b.word ? 1 : 0); };
+    return function (a, b) { return b.addedAt - a.addedAt; };
+  }
+
+  function cardboxFilteredSorted(box) {
+    const q = cardboxRenderState.search;
+    const filtered = q ? box.filter(function (c) { return c.word.indexOf(q) !== -1; }) : box.slice();
+    filtered.sort(cardboxSortCompare(cardboxRenderState.sort));
+    return filtered;
+  }
 
   function cardboxRowHTML(c, now) {
     const isDue = (c.due || 0) <= now;
@@ -1189,7 +1219,8 @@
       updateCardboxSelectedCount();
       const selectAllCb = document.getElementById('cardboxSelectAll');
       if (selectAllCb) {
-        selectAllCb.checked = cardboxRenderState.selected.size === loadCardbox().length && loadCardbox().length > 0;
+        selectAllCb.checked = cardboxRenderState.sorted.length > 0 &&
+          cardboxRenderState.sorted.every(function (c) { return cardboxRenderState.selected.has(c.word); });
       }
     });
 
@@ -1199,15 +1230,30 @@
 
     document.getElementById('cardboxSelectAll').addEventListener('change', function (e) {
       const checked = e.target.checked;
-      const box = loadCardbox();
+      // Only affect words in the current (possibly search-filtered) result
+      // set — selections made under a different search stay untouched.
       if (checked) {
-        box.forEach(function (c) { cardboxRenderState.selected.add(c.word); });
+        cardboxRenderState.sorted.forEach(function (c) { cardboxRenderState.selected.add(c.word); });
       } else {
-        cardboxRenderState.selected.clear();
+        cardboxRenderState.sorted.forEach(function (c) { cardboxRenderState.selected.delete(c.word); });
       }
       // Update checkboxes currently rendered on screen.
       listEl.querySelectorAll('.cardbox-check').forEach(function (cb) { cb.checked = checked; });
       updateCardboxSelectedCount();
+    });
+
+    let cardboxSearchTimer = null;
+    document.getElementById('cardboxSearch').addEventListener('input', function (e) {
+      clearTimeout(cardboxSearchTimer);
+      cardboxSearchTimer = setTimeout(function () {
+        cardboxRenderState.search = e.target.value.trim().toUpperCase();
+        renderCardboxTab();
+      }, 200);
+    });
+
+    document.getElementById('cardboxSortSelect').addEventListener('change', function (e) {
+      cardboxRenderState.sort = e.target.value;
+      renderCardboxTab();
     });
 
     document.getElementById('studySelectedBtn').addEventListener('click', function () {
@@ -1220,6 +1266,13 @@
       const mode = document.getElementById('studyMode').value;
       const anagramOrder = document.getElementById('anagramOrder').value;
       startStudySession(queue, mode, anagramOrder);
+    });
+
+    document.getElementById('anagramReviewSelectedBtn').addEventListener('click', function () {
+      const selectedWords = cardboxRenderState.selected;
+      if (!selectedWords.size) { showToast('กรุณาเลือกคำศัพท์อย่างน้อย 1 คำ'); return; }
+      const words = Array.from(selectedWords).sort();
+      startAnagramReview(words, parseInt(document.getElementById('reviewSeconds').value, 10) || 5);
     });
   }
 
@@ -1258,6 +1311,33 @@
 
       const queue = dueOnly ? pool.slice(0, n) : shuffle(pool).slice(0, n);
       startStudySession(queue, mode, anagramOrder);
+    });
+
+    document.getElementById('startAnagramReviewBtn').addEventListener('click', function () {
+      const box = loadCardbox();
+      if (!box.length) { showToast('Cardbox ว่างอยู่ — เลือกคำศัพท์จากแท็บแบบทดสอบก่อน'); return; }
+
+      const dueOnly = document.getElementById('dueOnlyToggle').checked;
+      const minLen = Math.max(1, parseInt(document.getElementById('studyMinLen').value, 10) || 1);
+      const maxLen = Math.max(minLen, parseInt(document.getElementById('studyMaxLen').value, 10) || 99);
+      const now = Date.now();
+
+      let pool = dueOnly ? box.filter(function (c) { return (c.due || 0) <= now; }) : box.slice();
+      pool = pool.filter(function (c) { return c.word.length >= minLen && c.word.length <= maxLen; });
+      if (!pool.length) {
+        showToast(dueOnly
+          ? 'ไม่มีคำที่ถึงกำหนดทบทวนในช่วงความยาวนี้ — ลองปรับความยาวหรือปิด "เฉพาะคำที่ถึงกำหนด"'
+          : 'ไม่มีคำใน Cardbox ที่อยู่ในช่วงความยาวนี้');
+        return;
+      }
+
+      let n = parseInt(document.getElementById('studyCount').value, 10) || pool.length;
+      n = Math.max(1, Math.min(n, pool.length));
+
+      // Review mode is for browsing, not grading, so it keeps a stable
+      // A→Z order rather than the shuffled/due-first order used for quizzes.
+      const words = pool.map(function (c) { return c.word; }).sort().slice(0, n);
+      startAnagramReview(words, parseInt(document.getElementById('reviewSeconds').value, 10) || 5);
     });
 
     document.getElementById('resetBtn').addEventListener('click', function () {
@@ -1332,6 +1412,122 @@
   // ---------- Study session ----------
 
   const session = { queue: [], index: 0, mode: 'flashcard', anagramOrder: 'alpha', correct: 0, incorrect: 0, flipped: false, hintLevel: 0, hintUsed: false };
+
+  // ---------- Anagram Review (passive, no typing/grading) ----------
+
+  const review = { queue: [], index: 0, seconds: 5, timerHandle: null, playing: false };
+
+  function startAnagramReview(cards, seconds) {
+    if (!cards.length) { showToast('กรุณาเลือกคำศัพท์อย่างน้อย 1 คำ'); return; }
+    review.queue = cards;
+    review.index = 0;
+    review.seconds = Math.max(1, seconds || 5);
+    review.playing = false;
+    if (review.timerHandle) { clearInterval(review.timerHandle); review.timerHandle = null; }
+    document.getElementById('reviewSeconds').value = review.seconds;
+    document.getElementById('cardboxSetup').style.display = 'none';
+    document.getElementById('cardboxList').style.display = 'none';
+    document.getElementById('anagramReview').classList.add('open');
+    document.addEventListener('keydown', reviewKeyHandler);
+    renderReviewCard();
+  }
+
+  function endAnagramReview() {
+    reviewStop();
+    document.removeEventListener('keydown', reviewKeyHandler);
+    document.getElementById('anagramReview').classList.remove('open');
+    document.getElementById('cardboxSetup').style.display = '';
+    document.getElementById('cardboxList').style.display = '';
+  }
+
+  function reviewStop() {
+    if (review.timerHandle) { clearInterval(review.timerHandle); review.timerHandle = null; }
+    review.playing = false;
+    const btn = document.getElementById('reviewPlayBtn');
+    if (btn) btn.textContent = '▶';
+  }
+
+  function reviewPlay() {
+    if (review.index >= review.queue.length - 1) return;
+    review.playing = true;
+    const btn = document.getElementById('reviewPlayBtn');
+    if (btn) btn.textContent = '⏸';
+    if (review.timerHandle) clearInterval(review.timerHandle);
+    review.timerHandle = setInterval(function () {
+      if (review.index >= review.queue.length - 1) { reviewStop(); return; }
+      review.index++;
+      renderReviewCard();
+    }, review.seconds * 1000);
+  }
+
+  function reviewGoto(i) {
+    review.index = Math.max(0, Math.min(i, review.queue.length - 1));
+    reviewStop();
+    renderReviewCard();
+  }
+
+  function renderReviewCard() {
+    const total = review.queue.length;
+    const i = review.index;
+    const word = review.queue[i];
+
+    document.getElementById('reviewProgressLabel').textContent =
+      'คำที่ ' + (i + 1) + ' / ' + total + '   ·   ⌨️ ← → = เลื่อนคำ · Space = เล่น/หยุด · Esc = ออก';
+    document.getElementById('reviewBarFill').style.width = (total ? Math.round(((i + 1) / total) * 100) : 0) + '%';
+    document.getElementById('reviewPromptLabel').textContent =
+      'Review Anagram: ' + word + ' (' + word.length + ' ตัวอักษร)';
+    document.getElementById('reviewTiles').innerHTML = tileRowHTML(sortLetters(word), 'big');
+    document.getElementById('reviewCurrentWord').textContent = sortLetters(word);
+
+    const answers = Array.from(new Set([word].concat(getAnagrams(word)))).sort();
+    const listEl = document.getElementById('reviewAnswerList');
+    if (!answers.length) {
+      listEl.innerHTML = '<span class="review-empty">ไม่พบคำในพจนานุกรม</span>';
+    } else {
+      listEl.innerHTML = answers.map(function (w) {
+        return '<span class="review-word' + (w === word ? ' is-target' : '') + '">' + w + '</span>';
+      }).join('');
+    }
+
+    document.getElementById('reviewFooterHint').textContent =
+      'แสดง ' + (i + 1) + '/' + total + ' คำ · พบ ' + answers.length + ' Anagram';
+
+    document.getElementById('reviewFirstBtn').disabled = i === 0;
+    document.getElementById('reviewPrevBtn').disabled = i === 0;
+    document.getElementById('reviewNextBtn').disabled = i >= total - 1;
+    document.getElementById('reviewLastBtn').disabled = i >= total - 1;
+
+    if (i >= total - 1) reviewStop();
+  }
+
+  function reviewKeyHandler(e) {
+    if (e.key === 'Escape') { e.preventDefault(); endAnagramReview(); return; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); reviewGoto(review.index + 1); return; }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); reviewGoto(review.index - 1); return; }
+    if (e.key === ' ') {
+      e.preventDefault();
+      if (review.playing) reviewStop(); else reviewPlay();
+    }
+  }
+
+  function initAnagramReview() {
+    document.getElementById('reviewFirstBtn').addEventListener('click', function () { reviewGoto(0); });
+    document.getElementById('reviewPrevBtn').addEventListener('click', function () { reviewGoto(review.index - 1); });
+    document.getElementById('reviewNextBtn').addEventListener('click', function () { reviewGoto(review.index + 1); });
+    document.getElementById('reviewLastBtn').addEventListener('click', function () { reviewGoto(review.queue.length - 1); });
+    document.getElementById('reviewPlayBtn').addEventListener('click', function () {
+      if (review.playing) reviewStop(); else reviewPlay();
+    });
+    document.getElementById('reviewSeconds').addEventListener('change', function (e) {
+      let v = parseInt(e.target.value, 10) || 5;
+      v = Math.max(1, Math.min(60, v));
+      e.target.value = v;
+      review.seconds = v;
+      if (review.playing) { reviewStop(); reviewPlay(); }
+    });
+    document.getElementById('reviewExitBtn').addEventListener('click', endAnagramReview);
+  }
+
 
   function sessionKeyHandler(e) {
     if (e.key === 'Escape') {
@@ -3138,6 +3334,7 @@
     initQuizTab();
     initCardboxTab();
     initCardboxList();
+    initAnagramReview();
     initDueTimeControls();
     initImportExport();
     initCardboxImportExport();
