@@ -442,6 +442,24 @@ main {
 }
 #studySession.open { display: block; }
 
+#anagramReview {
+  display: none;
+}
+#anagramReview.open { display: block; }
+
+.anagram-review-list {
+  margin: 1.1rem 0;
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  line-height: 2;
+  color: var(--ink);
+}
+.anagram-review-list .review-word { display: block; }
+.anagram-review-list .review-word.is-target { font-weight: 700; color: var(--teal); }
+.anagram-review-list .review-empty { color: #8fae9f; font-size: 0.9rem; }
+
+#reviewTimerRow, #reviewNavRow { margin-top: 0.8rem; }
+
 .session-progress { font-family: var(--font-mono); font-size: 0.82rem; color: #8fae9f; margin-bottom: 0.9rem; }
 .session-bar { height: 5px; background: var(--board-2); border-radius: 4px; overflow: hidden; margin-bottom: 1.3rem; }
 .session-bar-fill { height: 100%; background: var(--brass); transition: width .25s ease; }
