@@ -22,6 +22,7 @@
   const TILE_BAG_TOTAL = 100;
 
   const CARDBOX_KEY = 'csw24_cardbox_v1';
+  const CARDBOX_SELECTION_KEY = 'csw24_cardbox_selection_v1';
   const CUSTOM_KEY = 'csw24_custom_words_v1';
   const SETTINGS_KEY = 'csw24_settings_v1';
   const DAY_MS = 86400000;
@@ -1095,9 +1096,11 @@
 
     // Drop any selected words that no longer exist in the cardbox.
     const stillPresent = new Set(box.map(function (c) { return c.word; }));
+    let selectionChanged = false;
     cardboxRenderState.selected.forEach(function (w) {
-      if (!stillPresent.has(w)) cardboxRenderState.selected.delete(w);
+      if (!stillPresent.has(w)) { cardboxRenderState.selected.delete(w); selectionChanged = true; }
     });
+    if (selectionChanged) saveCardboxSelection();
 
     const listEl = document.getElementById('cardboxList');
     if (!box.length) {
@@ -1134,7 +1137,26 @@
   // Cardbox list is paginated like the Word Browser (PAGE_SIZE per page) and
   // uses a single delegated click listener instead of one per row, so large
   // cardboxes (hundreds/thousands of cards) don't lag the UI.
-  const cardboxRenderState = { sorted: [], shown: 0, selected: new Set(), search: '', sort: 'recent' };
+  const cardboxRenderState = { sorted: [], shown: 0, selected: loadCardboxSelection(), search: '', sort: 'recent' };
+
+  // Persists the set of ticked words to localStorage so an accidental
+  // refresh/reload doesn't lose which words the learner had picked out —
+  // otherwise they'd have to search and re-tick everything from scratch.
+  function loadCardboxSelection() {
+    try {
+      const raw = localStorage.getItem(CARDBOX_SELECTION_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch (e) {
+      return new Set();
+    }
+  }
+
+  function saveCardboxSelection() {
+    try {
+      localStorage.setItem(CARDBOX_SELECTION_KEY, JSON.stringify(Array.from(cardboxRenderState.selected)));
+    } catch (e) { /* ignore */ }
+  }
 
   function cardboxSortCompare(sort) {
     if (sort === 'rounds-desc') return function (a, b) { return (b.correct + b.incorrect) - (a.correct + a.incorrect); };
@@ -1199,6 +1221,7 @@
       cardboxRenderState.sorted = cardboxRenderState.sorted.filter(function (c) { return c.word !== word; });
       cardboxRenderState.shown = Math.max(0, cardboxRenderState.shown - 1);
       cardboxRenderState.selected.delete(word);
+      saveCardboxSelection();
       document.getElementById('cardboxCount').textContent = loadCardbox().length;
       updateCardboxSelectedCount();
       const selectAllCb = document.getElementById('cardboxSelectAll');
@@ -1216,6 +1239,7 @@
       const word = cb.dataset.word;
       if (cb.checked) cardboxRenderState.selected.add(word);
       else cardboxRenderState.selected.delete(word);
+      saveCardboxSelection();
       updateCardboxSelectedCount();
       const selectAllCb = document.getElementById('cardboxSelectAll');
       if (selectAllCb) {
@@ -1237,6 +1261,7 @@
       } else {
         cardboxRenderState.sorted.forEach(function (c) { cardboxRenderState.selected.delete(c.word); });
       }
+      saveCardboxSelection();
       // Update checkboxes currently rendered on screen.
       listEl.querySelectorAll('.cardbox-check').forEach(function (cb) { cb.checked = checked; });
       updateCardboxSelectedCount();
@@ -1698,6 +1723,12 @@
     const input = document.getElementById('anagramInput');
     const feedback = document.getElementById('anagramFeedback');
     const hintBtn = document.getElementById('anagramHintBtn');
+    // The `autofocus` attribute only fires on the element's very first
+    // insertion in some browsers/webviews — replacing area.innerHTML on
+    // every card doesn't reliably re-trigger it, so the learner ends up
+    // having to click the input box before every single word. Focus it
+    // explicitly on every render instead.
+    input.focus();
     const hintText = document.getElementById('anagramHintText');
     const progressEl = document.getElementById('anagramFoundProgress');
 
@@ -1816,6 +1847,10 @@
 
     const form = document.getElementById('recallForm');
     const feedback = document.getElementById('recallFeedback');
+    // Same reasoning as the Anagram card: explicitly focus the input on
+    // every render, since `autofocus` doesn't reliably refire when the
+    // element is replaced via innerHTML on each new word.
+    document.getElementById('recallInput').focus();
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       const input = document.getElementById('recallInput');
