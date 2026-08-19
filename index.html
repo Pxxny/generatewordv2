@@ -64,10 +64,15 @@
         <p class="field-hint" id="genSummaryLine"></p>
         <div id="genResults"></div>
       </div>
+      <div class="quiz-list-head">
+        <label class="checkbox-field"><input type="checkbox" id="genSelectAll"> <span data-i18n="common.selectAll">เลือกทั้งหมด</span></label>
+        <span class="selected-count" id="genSelectedCount">เลือกแล้ว 0 คำ</span>
+      </div>
       <div class="btn-row">
         <button class="btn btn-outline btn-sm" id="exportPdfBtn">⬇ Export PDF</button>
         <button class="btn btn-outline btn-sm" id="exportJpgBtn">⬇ Export JPG</button>
         <button class="btn btn-outline btn-sm" id="exportPngBtn">⬇ Export PNG</button>
+        <button class="btn btn-teal" id="genSaveBtn" data-i18n="common.saveToCardbox">💾 Save to Cardbox</button>
       </div>
     </div>
   </section>
@@ -318,7 +323,13 @@
             <option value="alpha">ตัวอักษร (A-Z)</option>
             <option value="prob-desc">Prob: มากไปน้อย</option>
             <option value="prob-asc">Prob: น้อยไปมาก</option>
+            <option value="play-desc">Playability: มากไปน้อย</option>
+            <option value="play-asc">Playability: น้อยไปมาก</option>
           </select>
+        </div>
+        <div class="field" style="max-width:11rem;margin-bottom:0">
+          <label for="browseLimitInput">จำกัดจำนวนคำที่แสดง (0 = ทั้งหมด)</label>
+          <input type="number" id="browseLimitInput" min="0" step="1" placeholder="0 = ทั้งหมด" value="0">
         </div>
       </div>
       <p class="field-hint" id="browseResultCount"></p>
@@ -499,8 +510,13 @@
       <h2 data-i18n="dash.suggested">คำแนะนำสำหรับวันนี้</h2>
       <p class="panel-sub" data-i18n="dash.suggestedSub">สุ่มมาให้ตอนเปิดเว็บ (รีเฉพาะตอนรีเฟรชหน้า) ความยาวตามที่ตั้งไว้ในหน้า Setting</p>
       <div id="dashSuggestedWords"></div>
+      <div class="quiz-list-head">
+        <label class="checkbox-field"><input type="checkbox" id="dashSelectAll"> <span data-i18n="common.selectAll">เลือกทั้งหมด</span></label>
+        <span class="selected-count" id="dashSelectedCount">เลือกแล้ว 0 คำ</span>
+      </div>
       <div class="btn-row">
         <button class="btn btn-outline btn-sm" id="dashSuggestedRefreshBtn" data-i18n="dash.suggestedRefresh">🔁 สุ่มใหม่ (ไม่รอ refresh หน้า)</button>
+        <button class="btn btn-teal" id="dashSaveBtn" data-i18n="common.saveToCardbox">💾 Save to Cardbox</button>
       </div>
     </div>
   </section>
