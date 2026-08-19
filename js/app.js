@@ -54,6 +54,7 @@
       'cardbox.sortRoundsAsc': 'จำนวนรอบเรียน: น้อย→มาก', 'cardbox.sortAlpha': 'ตัวอักษร (A→Z)',
       'cardbox.anagramReviewStart': '📖 Anagram Review', 'cardbox.anagramReviewSelected': '📖 Anagram Review คำที่เลือก',
       'cardbox.reviewSecondsLabel': 'วินาที', 'cardbox.reviewExit': '↩ ออกจาก Review',
+      'cardbox.reviewStartStudy': '▶ เริ่มเรียนคำชุดนี้',
       'browse.title': 'คลังคำศัพท์ทั้งหมด', 'browse.search': '🔍 ค้นหา (Enter)', 'browse.clear': 'ล้างตัวกรอง', 'browse.sortLabel': 'เรียงลำดับ',
       'browse.wordSearchLabel': '🔍 ค้นหาคำศัพท์', 'browse.selectedCount': 'เลือกแล้ว 0 คำ', 'browse.saveSelected': '💾 บันทึกที่เลือกลง Cardbox',
       'mini.title': '🕹️ Minigame', 'mini.typing': '⌨️ พิมพ์ศัพท์ Random', 'mini.racks': '🁢 Random Racks',
@@ -101,6 +102,7 @@
       'cardbox.sortRoundsAsc': 'Study rounds: low→high', 'cardbox.sortAlpha': 'Alphabetical (A→Z)',
       'cardbox.anagramReviewStart': '📖 Anagram Review', 'cardbox.anagramReviewSelected': '📖 Anagram Review selected',
       'cardbox.reviewSecondsLabel': 'seconds', 'cardbox.reviewExit': '↩ Exit Review',
+      'cardbox.reviewStartStudy': '▶ Start studying this set',
       'browse.title': 'Full word dictionary', 'browse.search': '🔍 Search (Enter)', 'browse.clear': 'Clear filters', 'browse.sortLabel': 'Sort by',
       'browse.wordSearchLabel': '🔍 Search for a word', 'browse.selectedCount': '0 selected', 'browse.saveSelected': '💾 Save selected to Cardbox',
       'mini.title': '🕹️ Minigame', 'mini.typing': '⌨️ Random Word Typing', 'mini.racks': '🁢 Random Racks',
@@ -1571,6 +1573,12 @@
     document.getElementById('reviewNextBtn').disabled = i >= total - 1;
     document.getElementById('reviewLastBtn').disabled = i >= total - 1;
 
+    // Reached the last card — offer a direct way to jump into a proper
+    // study/quiz session on the same set of words instead of forcing the
+    // learner back to the setup screen to rebuild the selection.
+    const startStudyBtn = document.getElementById('reviewStartStudyBtn');
+    if (startStudyBtn) startStudyBtn.style.display = (i >= total - 1) ? '' : 'none';
+
     if (i >= total - 1) reviewStop();
   }
 
@@ -1600,6 +1608,21 @@
       if (review.playing) { reviewStop(); reviewPlay(); }
     });
     document.getElementById('reviewExitBtn').addEventListener('click', endAnagramReview);
+
+    document.getElementById('reviewStartStudyBtn').addEventListener('click', function () {
+      const words = review.queue.slice();
+      if (!words.length) return;
+      const box = loadCardbox();
+      const byWord = {};
+      box.forEach(function (c) { byWord[c.word] = c; });
+      // Reuse the existing cardbox card (so SM-2 progress carries over) when
+      // available, otherwise fall back to a plain word wrapper — Anagram
+      // Review can include words that aren't in the Cardbox at all.
+      const queue = words.map(function (w) { return byWord[w] || { word: w }; });
+
+      endAnagramReview();
+      startStudySession(queue, 'anagram', document.getElementById('anagramOrder').value || 'alpha');
+    });
   }
 
 
@@ -1755,6 +1778,7 @@
         '</div>' +
         tileRowHTML(letters, 'big') +
         (validGroup.length > 1 ? '<div class="anagram-found-progress" id="anagramFoundProgress">พบแล้ว 0 / ' + validGroup.length + ' คำ</div>' : '') +
+        (validGroup.length > 1 ? '<div class="anagram-partners" id="anagramFoundList"></div>' : '') +
         '<form class="session-answer-form" id="anagramForm">' +
           '<input type="text" id="anagramInput" autocomplete="off" placeholder="พิมพ์คำตอบ — ตรวจให้อัตโนมัติ" autofocus>' +
         '</form>' +
@@ -1780,6 +1804,14 @@
     input.focus();
     const hintText = document.getElementById('anagramHintText');
     const progressEl = document.getElementById('anagramFoundProgress');
+    const foundListEl = document.getElementById('anagramFoundList');
+
+    function renderFoundList() {
+      if (!foundListEl) return;
+      foundListEl.innerHTML = Array.from(found).sort().map(function (w) {
+        return '<span class="anagram-chip">' + w + '</span>';
+      }).join('');
+    }
 
     hintBtn.addEventListener('click', function () {
       // Reveal one more letter each click, up to word.length - 1 so the
@@ -1848,6 +1880,7 @@
         input.value = '';
 
         if (progressEl) progressEl.textContent = 'พบแล้ว ' + found.size + ' / ' + validGroup.length + ' คำ';
+        renderFoundList();
 
         if (found.size < validGroup.length) {
           // Still missing at least one valid word — keep the input open
