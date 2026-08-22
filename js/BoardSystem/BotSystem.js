@@ -28,6 +28,37 @@
     return global.CSW24_WORDSET.has(String(word).trim().toUpperCase());
   }
 
+  // "Simple/everyday word" filter for Basic Bot: avoids obscure short combos
+  // and rare letters (J,Q,X,Z) so Basic plays words a beginner would actually
+  // know, rather than obscure valid Scrabble words. Roughly approximates
+  // word frequency without needing real frequency data: prefers words built
+  // only from common letters and without unusual repeated-letter patterns.
+  const RARE_LETTERS = /[JQXZ]/;
+  function isSimpleWord(word) {
+    if (word.length < 2 || word.length > 7) return false;
+    if (RARE_LETTERS.test(word)) return false;
+    return true;
+  }
+
+  let simpleWordSetCache = null;
+  function ensureSimpleWordSet() {
+    if (simpleWordSetCache) return simpleWordSetCache;
+    ensureWordSet();
+    simpleWordSetCache = new Set();
+    for (const w of global.CSW24_WORDSET) {
+      if (isSimpleWord(w)) simpleWordSetCache.add(w);
+    }
+    return simpleWordSetCache;
+  }
+
+  // Word pool a given bot profile should draw candidate words from.
+  function wordPoolForProfile(profile, wordLen) {
+    const all = global.CSW24_BY_LENGTH[wordLen] || [];
+    if (!profile.simpleWordsOnly) return all;
+    const simpleSet = ensureSimpleWordSet();
+    return all.filter(w => simpleSet.has(w));
+  }
+
   // Rack-letter-count helper: does `rackCounts` (map letter->count, '?' = blanks)
   // contain enough letters to spell `word`, given some fixed letters already on
   // the board at certain positions within the word? Returns the list of rack
@@ -65,32 +96,38 @@
     basic: {
       label: 'Basic Bot',
       rating: 1200,
-      maxWordLenPreference: 6,   // tends to play short, simple words
-      bingoChance: 0.15,         // rarely finds/plays bingos, and only "basic" ones
-      searchDepth: 40,           // fewer candidate anchors explored
+      maxWordLenPreference: 7,   // everyday words, 2-7 letters
+      simpleWordsOnly: true,     // avoid obscure words / rare letters (J,Q,X,Z)
+      bingoChance: 0.10,         // rarely finds/plays bingos
+      searchDepth: 40,
       rackManagementSkill: 0.2,  // poor at keeping good leaves
       mistakeChance: 0.25,       // sometimes skips a better word for a worse one
-      thinkTimeMs: [900, 1800]
+      thinkTimeMs: [4000, 10000],
+      thinkTimeCapMs: 10000
     },
     medium: {
       label: 'Medium Bot',
       rating: 1400,
-      maxWordLenPreference: 8,
-      bingoChance: 0.45,
+      maxWordLenPreference: 9,
+      simpleWordsOnly: false,    // uses specialty words, including J/Q/X/Z
+      bingoChance: 0.55,         // actively hunts high-probability bingos
       searchDepth: 90,
       rackManagementSkill: 0.55,
-      mistakeChance: 0.12,
-      thinkTimeMs: [1200, 2400]
+      mistakeChance: 0.10,
+      thinkTimeMs: [2000, 11000],
+      thinkTimeCapMs: 11000
     },
     henry: {
       label: 'Henry',
       rating: 1500,
       maxWordLenPreference: 10,
-      bingoChance: 0.65,
+      simpleWordsOnly: false,    // same vocabulary range as Medium, but plays it better
+      bingoChance: 0.7,
       searchDepth: 140,
-      rackManagementSkill: 0.7,
-      mistakeChance: 0.06,
-      thinkTimeMs: [1500, 3000]
+      rackManagementSkill: 0.8,
+      mistakeChance: 0.04,
+      thinkTimeMs: [5000, 9000],
+      thinkTimeCapMs: 9000
     }
   };
 
@@ -122,22 +159,27 @@
   // whether the rack (plus letters already fixed on the board along that line) can
   // actually spell them. This replaces the old "shuffle rack and hope it happens to
   // spell a word left-to-right" approach, which is why the bot used to pass so often.
-  function generateCandidates(board, rack, profile) {
+  function generateCandidates(board, rack, profile, genStart, capMs) {
     ensureWordSet();
     const anchors = findAnchors(board);
     const candidates = [];
     const rackCounts = rackToCounts(rack);
-    const maxLen = Math.min(7, profile.maxWordLenPreference + 2);
+    const maxLen = Math.min(7, profile.maxWordLenPreference);
     let explored = 0;
     const maxExplore = profile.searchDepth * 20; // overall budget so it stays fast
+    const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    // Leave headroom for the promised "thinking" delay: cap actual search work
+    // at 80% of the profile's max think time so we never blow past it.
+    const deadline = genStart !== undefined && capMs ? genStart + capMs * 0.8 : null;
 
     outer:
     for (const anchor of anchors) {
       for (const direction of ['H', 'V']) {
         const [dr, dc] = direction === 'H' ? [0, 1] : [1, 0];
         for (let wordLen = 2; wordLen <= maxLen; wordLen++) {
-          const wordsOfLen = global.CSW24_BY_LENGTH[wordLen];
-          if (!wordsOfLen) continue;
+          if (deadline && (explored % 200 === 0) && now() > deadline) break outer;
+          const wordsOfLen = wordPoolForProfile(profile, wordLen);
+          if (!wordsOfLen || wordsOfLen.length === 0) continue;
           for (let startOffset = 0; startOffset < wordLen; startOffset++) {
             const startR = anchor.r - dr * startOffset;
             const startC = anchor.c - dc * startOffset;
@@ -239,14 +281,31 @@
 
   // Public: given board+rack+level, return a Promise resolving to a chosen move
   // (or null meaning "pass/exchange"), after a simulated "thinking" delay.
-  function decideMove(board, rack, level) {
+  // opts.skipThinkDelay: if true, resolves immediately (no artificial delay) —
+  // used when the player chooses not to wait for the bot's "thinking" animation.
+  // Move generation itself is always bounded by profile.thinkTimeCapMs so the
+  // bot can never actually take longer than its stated max thinking time,
+  // regardless of board complexity.
+  function decideMove(board, rack, level, opts) {
     const profile = getProfile(level);
+    opts = opts || {};
+    const cap = profile.thinkTimeCapMs || 10000;
+
     return new Promise(resolve => {
-      const candidates = generateCandidates(board, rack, profile);
+      const genStart = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const candidates = generateCandidates(board, rack, profile, genStart, cap);
       const move = chooseMove(candidates, profile);
+
+      if (opts.skipThinkDelay) {
+        resolve(move);
+        return;
+      }
       const [minT, maxT] = profile.thinkTimeMs;
-      const delay = minT + Math.random() * (maxT - minT);
-      setTimeout(() => resolve(move), delay);
+      const randomDelay = minT + Math.random() * (maxT - minT);
+      const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - genStart;
+      // Total time (generation + wait) never exceeds the profile's cap.
+      const remainingDelay = Math.max(0, Math.min(randomDelay, cap - elapsed));
+      setTimeout(() => resolve(move), remainingDelay);
     });
   }
 

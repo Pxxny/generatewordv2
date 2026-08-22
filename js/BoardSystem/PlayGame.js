@@ -59,6 +59,15 @@
     $('playRecallBtn').addEventListener('click', recallPending);
     $('playHoldScoreBtn').addEventListener('click', holdManualScore);
     $('playCoinFlipContinueBtn').addEventListener('click', continueAfterCoinFlip);
+    $('playBotLevel').addEventListener('change', updateBotThinkTimeNote);
+    updateBotThinkTimeNote();
+  }
+
+  function updateBotThinkTimeNote() {
+    const level = $('playBotLevel').value;
+    const profile = global.BotSystem.getProfile(level);
+    const capSec = Math.round((profile.thinkTimeCapMs || 10000) / 1000);
+    $('playBotThinkTimeNote').textContent = `บอทคิดคำนานสุดประมาณ ${capSec} วินาที`;
   }
 
   let pendingGameOpts = null;
@@ -624,7 +633,10 @@
   }
 
   function doBotTurn() {
-    global.BotSystem.decideMove(state.board, state.botRack, state.botLevel).then(move => {
+    const waitForBotEl = $('playWaitForBot');
+    const skipThinkDelay = waitForBotEl ? !waitForBotEl.checked : false;
+    if (!skipThinkDelay) renderTurnIndicator(); // shows "บอทกำลังคิด..." while waiting
+    global.BotSystem.decideMove(state.board, state.botRack, state.botLevel, { skipThinkDelay }).then(move => {
       if (state.gameOver) return;
       if (!move) {
         logEntry('bot', 'บอท Pass');
