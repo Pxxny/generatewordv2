@@ -940,6 +940,7 @@
         if (btn.dataset.tab === 'dashboard') renderDashboard();
         if (btn.dataset.tab === 'settings') { renderDashboard(); }
         if (btn.dataset.tab === 'achievements' && window.Achievements) window.Achievements.renderTab();
+        if (btn.dataset.tab === 'play' && window.PlayGame) window.PlayGame.init();
         if (btn.dataset.tab === 'browse' && !browseInitialized) {
           browseInitialized = true;
           initBrowseChips();
