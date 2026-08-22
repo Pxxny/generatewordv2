@@ -969,6 +969,20 @@ main {
   min-height: 1.4em;
 }
 
+.play-bot-thinktime {
+  display: block;
+  font-size: 0.78rem;
+  opacity: 0.7;
+  margin-top: 0.2rem;
+}
+.play-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+.play-checkbox-label input { width: auto; }
+
 .play-topbar {
   display: flex;
   justify-content: space-between;
