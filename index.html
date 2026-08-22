@@ -23,6 +23,7 @@
   </div>
   <h1 data-i18n="app.title">CSW24 Word Lab</h1>
   <p data-i18n="app.subtitle">เจนคำศัพท์ · หา Anagram · เก็บลง Cardbox · ทบทวนแบบ Spaced Repetition · Minigame</p>
+  <p class="current-tab-label" id="currentTabLabel"></p>
 </header>
 
 <div class="burger-overlay" id="burgerOverlay"></div>
@@ -31,17 +32,15 @@
     <span class="burger-menu-title">เมนู</span>
     <button class="burger-close-btn" id="burgerCloseBtn" aria-label="ปิดเมนู">✕</button>
   </div>
+  <button class="tab-btn burger-tab-btn" data-tab="dashboard" data-i18n="tab.dashboard">📊 Dashboard</button>
+  <button class="tab-btn burger-tab-btn" data-tab="browse" data-i18n="tab.browse">📖 คลังคำศัพท์</button>
+  <button class="tab-btn burger-tab-btn" data-tab="builder" data-i18n="tab.builder">🧩 Word Builder</button>
+  <button class="tab-btn burger-tab-btn" data-tab="cardbox" data-i18n="tab.cardbox">🗂️ Cardbox</button>
   <button class="tab-btn burger-tab-btn" data-tab="generate" data-i18n="tab.generate">📝 สร้างคำศัพท์</button>
   <button class="tab-btn burger-tab-btn" data-tab="quiz" data-i18n="tab.quiz">🎯 แบบทดสอบ</button>
-</nav>
-
-<nav class="tab-nav">
-  <button class="tab-btn" data-tab="dashboard" data-i18n="tab.dashboard">📊 Dashboard</button>
-  <button class="tab-btn" data-tab="cardbox" data-i18n="tab.cardbox">🗂️ Cardbox</button>
-  <button class="tab-btn" data-tab="browse" data-i18n="tab.browse">📖 คลังคำศัพท์</button>
-  <button class="tab-btn" data-tab="minigame" data-i18n="tab.minigame">🕹️ Minigame</button>
-  <button class="tab-btn" data-tab="achievements" data-i18n="tab.achievements">🏆 Achievement</button>
-  <button class="tab-btn" id="settingsTabBtn" data-tab="settings" data-i18n="tab.settings">⚙️ Setting</button>
+  <button class="tab-btn burger-tab-btn" data-tab="minigame" data-i18n="tab.minigame">🕹️ Minigame</button>
+  <button class="tab-btn burger-tab-btn" data-tab="achievements" data-i18n="tab.achievements">🏆 Achievement</button>
+  <button class="tab-btn burger-tab-btn" id="settingsTabBtn" data-tab="settings" data-i18n="tab.settings">⚙️ Setting</button>
 </nav>
 
 <main>
@@ -122,6 +121,51 @@
     </div>
   </section>
 
+  <!-- ============== WORD BUILDER TAB ============== -->
+  <section id="tab-builder" class="tab-panel">
+    <div class="panel-card">
+      <h2 data-i18n="builder.title">🧩 Word Builder</h2>
+      <p class="panel-sub" id="builderSubText">พิมพ์ชุดตัวอักษร (Rack) เช่น <strong>TISANE?</strong> หรือ <strong>SATIRE?</strong> — ระบบจะแสดงคำศัพท์ทุกคำที่ประกอบขึ้นได้จากตัวอักษรเหล่านั้น (ใช้แต่ละตัวได้ไม่เกินจำนวนที่มี ใส่ <code>?</code> แทน Blank ใช้แทนตัวอักษรใดก็ได้)</p>
+
+      <div class="control-row">
+        <div class="field" style="flex:1;min-width:220px">
+          <label for="builderRackInput" data-i18n="builder.rackLabel">ตัวอักษร (Rack)</label>
+          <input type="text" id="builderRackInput" maxlength="20" placeholder="เช่น TISANE? หรือ SATIRE?" style="text-transform:uppercase">
+        </div>
+        <div class="field">
+          <label for="builderMinLen" data-i18n="common.minLen">ความยาวต่ำสุด</label>
+          <input type="number" id="builderMinLen" min="2" max="15" value="2">
+        </div>
+        <button class="btn btn-primary" id="builderSearchBtn" data-i18n="builder.build">🧩 หาคำศัพท์</button>
+      </div>
+      <div class="control-row">
+        <div class="field" style="min-width:220px">
+          <label for="builderSortSelect" data-i18n="browse.sortLabel">เรียงลำดับ</label>
+          <select id="builderSortSelect">
+            <option value="len-desc" data-i18n="builder.sortLenDesc">ความยาว: มากไปน้อย</option>
+            <option value="len-asc" data-i18n="builder.sortLenAsc">ความยาว: น้อยไปมาก</option>
+            <option value="alpha">ตัวอักษร (A-Z)</option>
+            <option value="score-desc">คะแนน: มากไปน้อย</option>
+            <option value="prob-desc">Prob: มากไปน้อย</option>
+            <option value="prob-asc">Prob: น้อยไปมาก</option>
+            <option value="play-desc">Playability: มากไปน้อย</option>
+            <option value="play-asc">Playability: น้อยไปมาก</option>
+          </select>
+        </div>
+      </div>
+      <p class="field-hint" id="builderResultCount"></p>
+    </div>
+
+    <div class="panel-card" id="builderResultsPanel" style="display:none">
+      <div class="btn-row" id="builderSelectRow" style="align-items:center">
+        <label class="checkbox-field"><input type="checkbox" id="builderSelectAll"> <span data-i18n="common.selectAll">เลือกทั้งหมด</span></label>
+        <span class="selected-count" id="builderSelectedCount">เลือกแล้ว 0 คำ</span>
+        <button class="btn btn-primary" id="builderSaveBtn" data-i18n="browse.saveSelected">💾 บันทึกที่เลือกลง Cardbox</button>
+      </div>
+      <div id="builderResults"></div>
+    </div>
+  </section>
+
   <!-- ============== CARDBOX TAB ============== -->
   <section id="tab-cardbox" class="tab-panel">
     <div class="panel-card">
@@ -177,6 +221,10 @@
             <option value="rounds-desc" data-i18n="cardbox.sortRoundsDesc">จำนวนรอบเรียน: มาก→น้อย</option>
             <option value="rounds-asc" data-i18n="cardbox.sortRoundsAsc">จำนวนรอบเรียน: น้อย→มาก</option>
             <option value="alpha" data-i18n="cardbox.sortAlpha">ตัวอักษร (A→Z)</option>
+            <option value="prob-desc" data-i18n="cardbox.sortProbDesc">Probability: มากไปน้อย</option>
+            <option value="prob-asc" data-i18n="cardbox.sortProbAsc">Probability: น้อยไปมาก</option>
+            <option value="play-desc" data-i18n="cardbox.sortPlayDesc">Playability: มากไปน้อย</option>
+            <option value="play-asc" data-i18n="cardbox.sortPlayAsc">Playability: น้อยไปมาก</option>
           </select>
         </div>
       </div>
