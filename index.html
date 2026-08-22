@@ -658,7 +658,18 @@
             <span class="play-mini-timer" id="playTimerBot">--:--</span>
           </div>
         </div>
-        <div class="play-bagcount">🎒 Tile Bag: <span id="playBagCount">100</span></div>
+        <div class="play-bagcount">
+          🎒 Tile Bag: <span id="playBagCount">100</span>
+          <button type="button" class="btn-link" id="playBagDetailBtn">ดูตัวอักษร</button>
+        </div>
+      </div>
+
+      <div class="play-bag-detail" id="playBagDetailPanel" style="display:none">
+        <div class="play-bag-detail-head">
+          <strong>ตัวอักษรที่เหลือใน Tile Bag</strong>
+          <button type="button" class="btn-link" id="playBagDetailCloseBtn">ปิด</button>
+        </div>
+        <div class="play-bag-detail-grid" id="playBagDetailGrid"></div>
       </div>
 
       <div class="play-board-wrap">
