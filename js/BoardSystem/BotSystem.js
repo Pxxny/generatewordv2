@@ -19,6 +19,38 @@
     return global.CSW24_WORDSET.has(word.toUpperCase());
   }
 
+  // Rack-letter-count helper: does `rackCounts` (map letter->count, '?' = blanks)
+  // contain enough letters to spell `word`, given some fixed letters already on
+  // the board at certain positions within the word? Returns the list of rack
+  // letters (in order, '?' entries flagged) needed, or null if impossible.
+  function canFormWord(word, rackCounts, fixedLetters) {
+    const counts = Object.assign({}, rackCounts);
+    const used = [];
+    for (let i = 0; i < word.length; i++) {
+      const ch = word[i];
+      if (fixedLetters[i] !== undefined) {
+        if (fixedLetters[i] !== ch) return null; // conflicts with existing board letter
+        continue; // letter already on board, doesn't consume rack
+      }
+      if (counts[ch] > 0) {
+        counts[ch]--;
+        used.push({ letter: ch, blank: false });
+      } else if (counts['?'] > 0) {
+        counts['?']--;
+        used.push({ letter: ch, blank: true });
+      } else {
+        return null;
+      }
+    }
+    return used;
+  }
+
+  function rackToCounts(rack) {
+    const counts = {};
+    rack.forEach(l => { counts[l] = (counts[l] || 0) + 1; });
+    return counts;
+  }
+
   // ---- Bot profiles ----
   const PROFILES = {
     basic: {
@@ -76,92 +108,97 @@
     return anchors;
   }
 
-  // Generate candidate placements: for each anchor, for each direction, try forming words
-  // using rack letters combined with existing board letters. Simplified but genuine
-  // approach: gather the "through letters" available at anchor lines, then check rack
-  // permutation subsets against the dictionary length-buckets.
+  // Generate candidate placements: for each anchor, for each direction, for each word
+  // length up to the rack size, scan real dictionary words of that length and check
+  // whether the rack (plus letters already fixed on the board along that line) can
+  // actually spell them. This replaces the old "shuffle rack and hope it happens to
+  // spell a word left-to-right" approach, which is why the bot used to pass so often.
   function generateCandidates(board, rack, profile) {
+    ensureWordSet();
     const anchors = findAnchors(board);
     const candidates = [];
-    const rackLetters = rack.slice();
-    const maxTries = profile.searchDepth;
-    let tries = 0;
+    const rackCounts = rackToCounts(rack);
+    const maxLen = Math.min(7, profile.maxWordLenPreference + 2);
+    let explored = 0;
+    const maxExplore = profile.searchDepth * 20; // overall budget so it stays fast
 
+    outer:
     for (const anchor of anchors) {
-      if (tries >= maxTries) break;
       for (const direction of ['H', 'V']) {
-        if (tries >= maxTries) break;
-        const result = tryBuildAtAnchor(board, anchor, direction, rackLetters, profile);
-        tries++;
-        if (result) candidates.push(result);
+        const [dr, dc] = direction === 'H' ? [0, 1] : [1, 0];
+        for (let wordLen = 2; wordLen <= maxLen; wordLen++) {
+          const wordsOfLen = global.CSW24_BY_LENGTH[wordLen];
+          if (!wordsOfLen) continue;
+          for (let startOffset = 0; startOffset < wordLen; startOffset++) {
+            const startR = anchor.r - dr * startOffset;
+            const startC = anchor.c - dc * startOffset;
+            if (!BS().inBounds(startR, startC)) continue;
+            const endR = startR + dr * (wordLen - 1);
+            const endC = startC + dc * (wordLen - 1);
+            if (!BS().inBounds(endR, endC)) continue;
+
+            // Build the "fixed letters" pattern from the board along this line,
+            // and confirm it actually touches the anchor cell.
+            const fixedLetters = {};
+            let touchesAnchor = false;
+            let newTileCount = 0;
+            let validLine = true;
+            for (let i = 0; i < wordLen; i++) {
+              const r = startR + dr * i, c = startC + dc * i;
+              const cell = board[r][c];
+              if (cell) {
+                fixedLetters[i] = cell.letter;
+                if (r === anchor.r && c === anchor.c) touchesAnchor = true;
+              } else {
+                newTileCount++;
+                if (r === anchor.r && c === anchor.c) touchesAnchor = true;
+              }
+            }
+            if (!validLine || !touchesAnchor || newTileCount === 0 || newTileCount > rack.length) continue;
+            // Skip if the cell right before/after the word is occupied (would merge into a longer word we're not accounting for)
+            const beforeR = startR - dr, beforeC = startC - dc;
+            const afterR = endR + dr, afterC = endC + dc;
+            if (BS().inBounds(beforeR, beforeC) && board[beforeR][beforeC]) continue;
+            if (BS().inBounds(afterR, afterC) && board[afterR][afterC]) continue;
+
+            // Try candidate words of this length that match the fixed-letter pattern.
+            let attemptsHere = 0;
+            const attemptCap = 25;
+            for (const candidateWord of wordsOfLen) {
+              if (explored++ > maxExplore) break outer;
+              if (attemptsHere++ > attemptCap) break;
+              const used = canFormWord(candidateWord, rackCounts, fixedLetters);
+              if (!used) continue;
+
+              const placements = [];
+              let uIdx = 0;
+              for (let i = 0; i < wordLen; i++) {
+                if (fixedLetters[i] !== undefined) continue;
+                const r = startR + dr * i, c = startC + dc * i;
+                const u = used[uIdx++];
+                placements.push({ r, c, letter: u.letter, blank: u.blank });
+              }
+              if (placements.length === 0) continue;
+
+              const shape = BS().validatePlacementShape(board, placements);
+              if (!shape.ok) continue;
+
+              const formed = BS().collectFormedWords(board, placements, shape.direction);
+              const allValid = formed.every(w => isValidWord(w.text));
+              if (!allValid) continue;
+
+              const { totalScore } = BS().scoreWords(board, placements, formed);
+              candidates.push({ placements, direction: shape.direction, score: totalScore, word: candidateWord, formed });
+
+              // Basic bot / medium bot: stop after finding a handful of options per slot
+              // to keep them from being unrealistically exhaustive; Henry explores more.
+              if (candidates.length >= profile.searchDepth) break outer;
+            }
+          }
+        }
       }
     }
     return candidates;
-  }
-
-  // Attempt to build a word at an anchor: try placing 1..7 rack tiles in the given
-  // direction starting at or through the anchor, validating the full word (and
-  // any perpendicular cross-words) against the dictionary.
-  function tryBuildAtAnchor(board, anchor, direction, rackLetters, profile) {
-    const [dr, dc] = direction === 'H' ? [0, 1] : [1, 0];
-    const maxLen = Math.min(7, profile.maxWordLenPreference + (Math.random() < 0.2 ? 2 : 0));
-    const shuffledRack = RM().shuffle(rackLetters);
-
-    for (let wordLen = Math.min(2, shuffledRack.length); wordLen <= Math.min(maxLen, 7); wordLen++) {
-      for (let startOffset = 0; startOffset < wordLen; startOffset++) {
-        const startR = anchor.r - dr * startOffset;
-        const startC = anchor.c - dc * startOffset;
-        if (!BS().inBounds(startR, startC)) continue;
-
-        const placements = [];
-        const usedRackIdx = new Set();
-        let letters = '';
-        let valid = true;
-        let touchesAnchor = false;
-
-        for (let i = 0; i < wordLen; i++) {
-          const r = startR + dr * i, c = startC + dc * i;
-          if (!BS().inBounds(r, c)) { valid = false; break; }
-          const existing = board[r][c];
-          if (existing) {
-            letters += existing.letter;
-            if (r === anchor.r && c === anchor.c) touchesAnchor = true;
-          } else {
-            const idx = shuffledRack.findIndex((l, k) => !usedRackIdx.has(k) && (l === '?' || l !== '?'));
-            let chosen = null, chosenIdx = -1;
-            for (let k = 0; k < shuffledRack.length; k++) {
-              if (usedRackIdx.has(k)) continue;
-              chosen = shuffledRack[k]; chosenIdx = k; break;
-            }
-            if (chosenIdx === -1) { valid = false; break; }
-            usedRackIdx.add(chosenIdx);
-            const isBlank = chosen === '?';
-            const letterToPlace = isBlank ? randomLetterGuess() : chosen;
-            letters += letterToPlace;
-            placements.push({ r, c, letter: letterToPlace, blank: isBlank });
-            if (r === anchor.r && c === anchor.c) touchesAnchor = true;
-          }
-        }
-        if (!valid || placements.length === 0 || !touchesAnchor) continue;
-        if (!isValidWord(letters)) continue;
-
-        const shape = BS().validatePlacementShape(board, placements);
-        if (!shape.ok) continue;
-
-        const formed = BS().collectFormedWords(board, placements, shape.direction);
-        const allValid = formed.every(w => isValidWord(w.text));
-        if (!allValid) continue;
-
-        const { totalScore } = BS().scoreWords(board, placements, formed);
-        return { placements, direction: shape.direction, score: totalScore, word: letters, formed };
-      }
-    }
-    return null;
-  }
-
-  function randomLetterGuess() {
-    const common = 'ETAOINSHRDLU';
-    return common[Math.floor(Math.random() * common.length)];
   }
 
   // Pick the bot's move given candidates, per profile skill (mistakes, bingo bias)
@@ -216,6 +253,7 @@
     decideMove,
     botSelfScore,
     isValidWord,
-    findAnchors
+    findAnchors,
+    ensureWordSet
   };
 })(window);

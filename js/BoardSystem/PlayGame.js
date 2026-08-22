@@ -60,6 +60,7 @@
     $('playGameCard').style.display = 'block';
     $('playBotLabel').textContent = global.BotSystem.getProfile(botLevel).label;
     $('playManualScoreWrap').style.display = scoringMode === 'manual' ? 'flex' : 'none';
+    $('playChallengeBtn').style.display = challengeRule === 'void' ? 'none' : '';
 
     renderAll();
     startTimer();
@@ -73,6 +74,7 @@
     renderScoreboard();
     renderBagCount();
     renderLog();
+    updateTimerDisplay();
   }
 
   function renderBoard() {
@@ -107,6 +109,21 @@
         cellEl.dataset.r = r;
         cellEl.dataset.c = c;
         cellEl.addEventListener('click', () => onCellClick(r, c));
+        cellEl.addEventListener('dragover', (e) => {
+          if (state.turn !== 'you' || state.gameOver) return;
+          if (state.board[r][c]) return;
+          e.preventDefault();
+          cellEl.classList.add('drag-over');
+        });
+        cellEl.addEventListener('dragleave', () => cellEl.classList.remove('drag-over'));
+        cellEl.addEventListener('drop', (e) => {
+          e.preventDefault();
+          cellEl.classList.remove('drag-over');
+          const idxStr = e.dataTransfer.getData('text/plain');
+          if (idxStr === '') return;
+          const idx = parseInt(idxStr, 10);
+          placeRackTileAt(idx, r, c);
+        });
         boardEl.appendChild(cellEl);
       }
     }
@@ -134,6 +151,19 @@
       tileEl.appendChild(val);
 
       tileEl.addEventListener('click', () => onRackTileClick(idx));
+
+      // Drag-and-drop: rack tiles can be dragged straight onto the board,
+      // not just clicked-then-clicked.
+      const draggable = state.turn === 'you' && !usedInPending && !state.gameOver;
+      tileEl.draggable = draggable;
+      if (draggable) {
+        tileEl.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', String(idx));
+          e.dataTransfer.effectAllowed = 'move';
+          tileEl.classList.add('tile-dragging');
+        });
+        tileEl.addEventListener('dragend', () => tileEl.classList.remove('tile-dragging'));
+      }
       rackEl.appendChild(tileEl);
     });
   }
@@ -141,6 +171,24 @@
   function renderScoreboard() {
     $('playScoreYou').textContent = state.youScore;
     $('playScoreBot').textContent = state.botScore;
+    renderTurnIndicator();
+  }
+
+  function renderTurnIndicator() {
+    const isYourTurn = state.turn === 'you' || state.turn === 'you-manual-pending';
+    const isBotTurn = state.turn === 'bot';
+    $('playScoreYouWrap').classList.toggle('turn-active', isYourTurn);
+    $('playScoreBotWrap').classList.toggle('turn-active', isBotTurn);
+    const label = $('playTurnIndicator');
+    if (state.gameOver) {
+      label.textContent = 'เกมจบแล้ว';
+    } else if (isYourTurn) {
+      label.textContent = '👉 ตาคุณ';
+    } else if (isBotTurn) {
+      label.textContent = '🤖 ตาบอทกำลังคิด...';
+    } else {
+      label.textContent = '';
+    }
   }
 
   function renderBagCount() {
@@ -179,14 +227,26 @@
     }
 
     if (state.selectedTileIdx === null) return;
-    let letter = state.youRack[state.selectedTileIdx];
+    placeRackTileAt(state.selectedTileIdx, r, c);
+  }
+
+  // Shared placement logic used by both click-to-place and drag-and-drop.
+  function placeRackTileAt(rackIdx, r, c) {
+    if (state.turn !== 'you' || state.gameOver) return;
+    if (state.board[r][c]) return; // occupied
+    if (state.pending.some(p => p.r === r && p.c === c)) return; // already has a pending tile
+    if (state.pending.some(p => p.rackIdx === rackIdx)) return; // tile already placed elsewhere this turn
+    const letter0 = state.youRack[rackIdx];
+    if (letter0 === undefined) return;
+
+    let letter = letter0;
     let isBlank = letter === '?';
     if (isBlank) {
       const chosen = prompt('เลือกตัวอักษรแทน Blank tile (A-Z):');
       if (!chosen || !/^[A-Za-z]$/.test(chosen)) return;
       letter = chosen.toUpperCase();
     }
-    state.pending.push({ r, c, letter, blank: isBlank, rackIdx: state.selectedTileIdx });
+    state.pending.push({ r, c, letter, blank: isBlank, rackIdx });
     state.selectedTileIdx = null;
     renderAll();
   }
@@ -219,9 +279,15 @@
     if (formed.length === 0) { alert('ไม่พบคำที่เกิดขึ้น'); return; }
 
     const invalidWords = formed.filter(w => !global.BotSystem.isValidWord(w.text));
-    // We still allow submission even if a word may be invalid (bot may Challenge it, "Void Challenge" style),
-    // but warn the player.
-    if (invalidWords.length > 0) {
+
+    if (state.challengeRule === 'void') {
+      // Void Challenge: no challenging allowed — every word MUST be in the CSW24
+      // dictionary or the move cannot be submitted at all.
+      if (invalidWords.length > 0) {
+        alert('Void Challenge: คำต่อไปนี้ไม่มีใน CSW24 จึงลงไม่ได้: ' + invalidWords.map(w => w.text).join(', '));
+        return;
+      }
+    } else if (invalidWords.length > 0) {
       const proceed = confirm('คำบางคำอาจไม่อยู่ใน CSW24: ' + invalidWords.map(w => w.text).join(', ') + '\nยืนยันลงคำหรือไม่? (บอทอาจ Challenge)');
       if (!proceed) return;
     }
@@ -326,9 +392,14 @@
 
   function challengeLastMove() {
     if (!state.lastMove || state.gameOver) return;
+    if (state.challengeRule === 'void') return; // Void Challenge: challenging is disabled entirely
     const move = state.lastMove;
+    // Ensure the CSW24 word set is built before checking, otherwise a valid word
+    // can incorrectly come back as "invalid" (the bug where challenges failed
+    // on words that were actually fine).
+    if (global.BotSystem.ensureWordSet) global.BotSystem.ensureWordSet();
     const invalid = move.formed.filter(w => !global.BotSystem.isValidWord(w.text));
-    const challenger = state.turn === 'bot' ? 'you' : 'bot'; // whoever's turn it currently is challenges the previous mover
+    const challenger = move.by === 'you' ? 'bot' : 'you'; // the OTHER player challenges the mover
     const failed = invalid.length === 0; // move was actually valid -> challenge fails
 
     if (failed) {
@@ -413,8 +484,13 @@
   // ---------- timer ----------
 
   function startTimer() {
-    if (state.timeMinutes === 0) { $('playTimer').textContent = '∞'; return; }
+    if (state.timeMinutes === 0) {
+      $('playTimerYou').textContent = '∞';
+      $('playTimerBot').textContent = '∞';
+      return;
+    }
     stopTimer();
+    updateTimerDisplay();
     timerInterval = setInterval(() => {
       if (state.gameOver) { stopTimer(); return; }
       if (state.turn === 'you') state.youSeconds = Math.max(0, state.youSeconds - 1);
@@ -433,11 +509,16 @@
     timerInterval = null;
   }
 
-  function updateTimerDisplay() {
-    const seconds = state.turn === 'you' ? state.youSeconds : state.botSeconds;
+  function formatSeconds(seconds) {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
     const s = (seconds % 60).toString().padStart(2, '0');
-    $('playTimer').textContent = `${m}:${s}`;
+    return `${m}:${s}`;
+  }
+
+  // Always show BOTH clocks at once (yours and the bot's), not just the active one.
+  function updateTimerDisplay() {
+    $('playTimerYou').textContent = formatSeconds(state.youSeconds);
+    $('playTimerBot').textContent = formatSeconds(state.botSeconds);
   }
 
   global.PlayGame = { init };
