@@ -897,3 +897,175 @@ main {
 /* ---------- additions: typed-word list (typing minigame) ---------- */
 
 #tgTypedList .quiz-item { }
+
+/* =========================================================
+   Play tab — real Scrabble board vs bot
+   ========================================================= */
+
+.play-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.9rem;
+  margin: 1rem 0;
+}
+.play-setup-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft, var(--cream));
+}
+.play-setup-grid select {
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--rail);
+  background: var(--board-2);
+  color: var(--cream);
+}
+
+.play-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+.play-scoreboard {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-family: var(--font-mono);
+}
+.play-score-you, .play-score-bot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 70px;
+}
+.play-score-you strong, .play-score-bot strong {
+  font-size: 1.4rem;
+  color: var(--brass);
+}
+.play-timer {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--teal);
+  padding: 0.2rem 0.8rem;
+  border: 1px solid var(--rail);
+  border-radius: 8px;
+  background: var(--board-1);
+}
+.play-bagcount {
+  font-size: 0.9rem;
+  color: var(--ink-soft, var(--cream));
+}
+
+.play-board-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 0.6rem 0;
+  overflow-x: auto;
+}
+.play-board {
+  display: grid;
+  grid-template-columns: repeat(15, minmax(24px, 34px));
+  grid-template-rows: repeat(15, minmax(24px, 34px));
+  gap: 2px;
+  background: var(--rail);
+  padding: 4px;
+  border-radius: 6px;
+}
+.play-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--board-2);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink-soft, var(--cream));
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+}
+.play-cell.premium-TW { background: var(--clay); color: var(--cream); }
+.play-cell.premium-DW { background: #7a4a58; color: var(--cream); }
+.play-cell.premium-TL { background: var(--teal-deep); color: var(--cream); }
+.play-cell.premium-DL { background: var(--teal); color: var(--cream); }
+.play-cell.center-star::after { content: "★"; position: absolute; opacity: 0.6; }
+.play-cell.has-tile {
+  background: var(--tile);
+  color: var(--ink);
+  box-shadow: inset 0 -3px 0 var(--tile-shadow);
+}
+.play-cell.pending-tile {
+  background: #e8dcc0;
+  color: var(--ink);
+  outline: 2px solid var(--brass);
+}
+.play-cell .tile-val {
+  position: absolute;
+  bottom: 1px;
+  right: 2px;
+  font-size: 0.5rem;
+  opacity: 0.7;
+}
+.play-cell.selected-cell { outline: 2px solid var(--brass); }
+
+.play-rack-wrap { display: flex; justify-content: center; margin: 0.9rem 0; }
+.play-rack { display: flex; gap: 6px; }
+.play-tile {
+  width: 40px;
+  height: 40px;
+  background: var(--tile);
+  color: var(--ink);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.1rem;
+  cursor: grab;
+  box-shadow: inset 0 -3px 0 var(--tile-shadow);
+  position: relative;
+}
+.play-tile.blank-tile { color: var(--clay-deep); }
+.play-tile.tile-used { opacity: 0.25; cursor: default; }
+.play-tile .tile-val { position: absolute; bottom: 1px; right: 3px; font-size: 0.55rem; opacity: 0.7; }
+.play-tile.tile-selected { outline: 2px solid var(--brass); }
+
+.play-manual-score {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.6rem 0;
+  font-size: 0.85rem;
+}
+.play-manual-score input { width: 80px; padding: 0.3rem; border-radius: 6px; border: 1px solid var(--rail); background: var(--board-2); color: var(--cream); }
+
+.play-actions { flex-wrap: wrap; }
+
+.play-log-wrap { margin-top: 1rem; }
+.play-move-log {
+  max-height: 220px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  background: var(--board-1);
+  border: 1px solid var(--rail);
+  border-radius: 8px;
+  padding: 0.6rem;
+}
+.play-move-log .log-entry { padding: 0.2rem 0; border-bottom: 1px dashed var(--rail); }
+.play-move-log .log-entry:last-child { border-bottom: none; }
+.play-move-log .log-you { color: var(--teal); }
+.play-move-log .log-bot { color: var(--clay); }
+
+@media (max-width: 640px) {
+  .play-board { grid-template-columns: repeat(15, minmax(18px, 22px)); grid-template-rows: repeat(15, minmax(18px, 22px)); }
+  .play-cell { font-size: 0.6rem; }
+  .play-tile { width: 32px; height: 32px; font-size: 0.9rem; }
+}
