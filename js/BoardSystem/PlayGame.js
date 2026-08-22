@@ -1,0 +1,444 @@
+// PlayGame.js — Play tab controller (wires BoardSystems + RackManage + BotSystem to UI)
+(function (global) {
+  'use strict';
+
+  let state = null;
+  let timerInterval = null;
+  let initialized = false;
+
+  function $(id) { return document.getElementById(id); }
+
+  function newGame(opts) {
+    const board = global.BoardSystems.createEmptyBoard();
+    const bag = global.RackManage.createBag();
+    const youRack = global.RackManage.drawTiles(bag, 7);
+    const botRack = global.RackManage.drawTiles(bag, 7);
+    return {
+      board, bag,
+      youRack, botRack,
+      youScore: 0, botScore: 0,
+      turn: 'you',
+      botLevel: opts.botLevel,
+      scoringMode: opts.scoringMode, // 'auto' | 'manual'
+      challengeRule: opts.challengeRule, // 'double' | 'plus5'
+      timeMinutes: opts.timeMinutes,
+      youSeconds: opts.timeMinutes * 60,
+      botSeconds: opts.timeMinutes * 60,
+      pending: [],          // tiles placed this turn but not submitted: {r,c,letter,blank,rackIdx}
+      selectedTileIdx: null,
+      lastMove: null,       // for challenge: {placements, direction, formed, score, by}
+      moveLog: [],
+      gameOver: false,
+      passStreak: 0
+    };
+  }
+
+  function init() {
+    if (initialized) return;
+    initialized = true;
+
+    $('playStartBtn').addEventListener('click', startGameFromSetup);
+    $('playScoringMode').addEventListener('change', () => {});
+    $('playSubmitBtn').addEventListener('click', submitMove);
+    $('playShuffleBtn').addEventListener('click', shuffleRack);
+    $('playExchangeBtn').addEventListener('click', exchangeSelected);
+    $('playPassBtn').addEventListener('click', passTurn);
+    $('playChallengeBtn').addEventListener('click', challengeLastMove);
+    $('playRecallBtn').addEventListener('click', recallPending);
+    $('playHoldScoreBtn').addEventListener('click', holdManualScore);
+  }
+
+  function startGameFromSetup() {
+    const botLevel = $('playBotLevel').value;
+    const timeMinutes = parseInt($('playTimeMinutes').value, 10);
+    const scoringMode = $('playScoringMode').value;
+    const challengeRule = $('playChallengeRule').value;
+
+    state = newGame({ botLevel, timeMinutes, scoringMode, challengeRule });
+
+    $('playSetupCard').style.display = 'none';
+    $('playGameCard').style.display = 'block';
+    $('playBotLabel').textContent = global.BotSystem.getProfile(botLevel).label;
+    $('playManualScoreWrap').style.display = scoringMode === 'manual' ? 'flex' : 'none';
+
+    renderAll();
+    startTimer();
+  }
+
+  // ---------- rendering ----------
+
+  function renderAll() {
+    renderBoard();
+    renderRack();
+    renderScoreboard();
+    renderBagCount();
+    renderLog();
+  }
+
+  function renderBoard() {
+    const boardEl = $('playBoard');
+    boardEl.innerHTML = '';
+    const size = global.BoardSystems.SIZE;
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        const cellEl = document.createElement('div');
+        cellEl.className = 'play-cell';
+        const premium = global.BoardSystems.getPremium(r, c);
+        if (premium) cellEl.classList.add('premium-' + premium);
+        if (r === 7 && c === 7) cellEl.classList.add('center-star');
+
+        const boardCell = state.board[r][c];
+        const pendingCell = state.pending.find(p => p.r === r && p.c === c);
+
+        if (boardCell) {
+          cellEl.classList.add('has-tile');
+          cellEl.textContent = boardCell.letter;
+          const val = document.createElement('span');
+          val.className = 'tile-val';
+          val.textContent = boardCell.blank ? '' : global.RackManage.tileValue(boardCell.letter);
+          cellEl.appendChild(val);
+        } else if (pendingCell) {
+          cellEl.classList.add('pending-tile');
+          cellEl.textContent = pendingCell.letter;
+        } else if (premium) {
+          cellEl.textContent = premiumLabel(premium);
+        }
+
+        cellEl.dataset.r = r;
+        cellEl.dataset.c = c;
+        cellEl.addEventListener('click', () => onCellClick(r, c));
+        boardEl.appendChild(cellEl);
+      }
+    }
+  }
+
+  function premiumLabel(p) {
+    return { TW: 'TW', DW: 'DW', TL: 'TL', DL: 'DL' }[p] || '';
+  }
+
+  function renderRack() {
+    const rackEl = $('playRack');
+    rackEl.innerHTML = '';
+    state.youRack.forEach((letter, idx) => {
+      const tileEl = document.createElement('div');
+      tileEl.className = 'play-tile';
+      if (letter === '?') tileEl.classList.add('blank-tile');
+      const usedInPending = state.pending.some(p => p.rackIdx === idx);
+      if (usedInPending) tileEl.classList.add('tile-used');
+      if (state.selectedTileIdx === idx) tileEl.classList.add('tile-selected');
+
+      tileEl.textContent = letter === '?' ? '' : letter;
+      const val = document.createElement('span');
+      val.className = 'tile-val';
+      val.textContent = global.RackManage.tileValue(letter);
+      tileEl.appendChild(val);
+
+      tileEl.addEventListener('click', () => onRackTileClick(idx));
+      rackEl.appendChild(tileEl);
+    });
+  }
+
+  function renderScoreboard() {
+    $('playScoreYou').textContent = state.youScore;
+    $('playScoreBot').textContent = state.botScore;
+  }
+
+  function renderBagCount() {
+    $('playBagCount').textContent = global.RackManage.bagCount(state.bag);
+  }
+
+  function renderLog() {
+    const logEl = $('playMoveLog');
+    logEl.innerHTML = state.moveLog.map(entry => {
+      const cls = entry.by === 'you' ? 'log-you' : 'log-bot';
+      return `<div class="log-entry ${cls}">${entry.text}</div>`;
+    }).join('');
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  // ---------- interaction ----------
+
+  function onRackTileClick(idx) {
+    if (state.turn !== 'you' || state.gameOver) return;
+    const alreadyUsed = state.pending.some(p => p.rackIdx === idx);
+    if (alreadyUsed) return;
+    state.selectedTileIdx = (state.selectedTileIdx === idx) ? null : idx;
+    renderRack();
+  }
+
+  function onCellClick(r, c) {
+    if (state.turn !== 'you' || state.gameOver) return;
+    if (state.board[r][c]) return; // occupied
+    const existingPendingIdx = state.pending.findIndex(p => p.r === r && p.c === c);
+
+    if (existingPendingIdx !== -1) {
+      // clicking an already-pending cell removes it (returns tile to rack)
+      state.pending.splice(existingPendingIdx, 1);
+      renderAll();
+      return;
+    }
+
+    if (state.selectedTileIdx === null) return;
+    let letter = state.youRack[state.selectedTileIdx];
+    let isBlank = letter === '?';
+    if (isBlank) {
+      const chosen = prompt('เลือกตัวอักษรแทน Blank tile (A-Z):');
+      if (!chosen || !/^[A-Za-z]$/.test(chosen)) return;
+      letter = chosen.toUpperCase();
+    }
+    state.pending.push({ r, c, letter, blank: isBlank, rackIdx: state.selectedTileIdx });
+    state.selectedTileIdx = null;
+    renderAll();
+  }
+
+  function recallPending() {
+    if (state.turn !== 'you') return;
+    state.pending = [];
+    renderAll();
+  }
+
+  function shuffleRack() {
+    if (state.pending.length > 0) return; // avoid index confusion mid-placement
+    state.youRack = global.RackManage.shuffle(state.youRack);
+    renderRack();
+  }
+
+  // ---------- submitting a move ----------
+
+  function submitMove() {
+    if (state.turn !== 'you' || state.gameOver) return;
+    if (state.pending.length === 0) { alert('ยังไม่ได้ลงคำ'); return; }
+
+    const shape = global.BoardSystems.validatePlacementShape(state.board, state.pending);
+    if (!shape.ok) {
+      alert(shapeErrorMessage(shape.reason));
+      return;
+    }
+
+    const formed = global.BoardSystems.collectFormedWords(state.board, state.pending, shape.direction);
+    if (formed.length === 0) { alert('ไม่พบคำที่เกิดขึ้น'); return; }
+
+    const invalidWords = formed.filter(w => !global.BotSystem.isValidWord(w.text));
+    // We still allow submission even if a word may be invalid (bot may Challenge it, "Void Challenge" style),
+    // but warn the player.
+    if (invalidWords.length > 0) {
+      const proceed = confirm('คำบางคำอาจไม่อยู่ใน CSW24: ' + invalidWords.map(w => w.text).join(', ') + '\nยืนยันลงคำหรือไม่? (บอทอาจ Challenge)');
+      if (!proceed) return;
+    }
+
+    finalizeYourMove(shape.direction, formed);
+  }
+
+  function finalizeYourMove(direction, formed) {
+    const placements = state.pending.slice();
+    const { totalScore, breakdown } = global.BoardSystems.scoreWords(state.board, placements, formed);
+
+    let scoreToApply = totalScore;
+    if (state.scoringMode === 'manual') {
+      // manual mode: score gets applied only through the Hold button flow.
+      state.lastMove = { placements, direction, formed, autoScore: totalScore, by: 'you', applied: false };
+      global.BoardSystems.applyPlacements(state.board, placements);
+      refillRackAfterMove('you', placements);
+      logEntry('you', `คุณลงคำ: ${formed.map(w => w.text).join(', ')} (รอใส่คะแนนเอง)`);
+      state.pending = [];
+      state.turn = 'you-manual-pending';
+      renderAll();
+      return;
+    }
+
+    state.youScore += scoreToApply;
+    global.BoardSystems.applyPlacements(state.board, placements);
+    state.lastMove = { placements, direction, formed, score: scoreToApply, by: 'you' };
+    logEntry('you', `คุณลงคำ: ${breakdown.map(b => `${b.word}(+${b.score})`).join(', ')} รวม +${scoreToApply}`);
+    refillRackAfterMove('you', placements);
+    state.pending = [];
+    state.passStreak = 0;
+    endTurn();
+  }
+
+  function holdManualScore() {
+    if (!state.lastMove || state.lastMove.by !== 'you' || state.lastMove.applied) return;
+    const val = parseInt($('playManualScoreInput').value, 10) || 0;
+    state.youScore += val;
+    state.lastMove.applied = true;
+    state.lastMove.score = val;
+    logEntry('you', `ยืนยันคะแนนเอง: +${val}`);
+    state.turn = 'you';
+    state.passStreak = 0;
+    endTurn();
+  }
+
+  function shapeErrorMessage(reason) {
+    return {
+      no_tiles: 'ยังไม่ได้วางตัวอักษร',
+      not_in_line: 'ตัวอักษรต้องอยู่แถวหรือคอลัมน์เดียวกัน',
+      must_cover_center: 'คำแรกต้องผ่านช่องกลาง (★)',
+      not_connected: 'คำต้องเชื่อมกับคำที่มีอยู่บนกระดาน',
+      gap_in_line: 'มีช่องว่างระหว่างตัวอักษรที่วาง'
+    }[reason] || 'การวางไม่ถูกต้อง';
+  }
+
+  function refillRackAfterMove(who, placements) {
+    const rackKey = who === 'you' ? 'youRack' : 'botRack';
+    const usedIdx = new Set(placements.map(p => p.rackIdx).filter(i => i !== undefined));
+    const remaining = state[rackKey].filter((_, idx) => !usedIdx.has(idx));
+    const needed = 7 - remaining.length;
+    const drawn = global.RackManage.drawTiles(state.bag, needed);
+    state[rackKey] = remaining.concat(drawn);
+  }
+
+  // ---------- pass / exchange ----------
+
+  function passTurn() {
+    if (state.turn !== 'you' || state.gameOver) return;
+    state.pending = [];
+    logEntry('you', 'คุณ Pass');
+    state.passStreak++;
+    checkGameEndByPasses();
+    endTurn();
+  }
+
+  function exchangeSelected() {
+    if (state.turn !== 'you' || state.gameOver) return;
+    if (global.RackManage.bagCount(state.bag) < 7) { alert('Tile Bag เหลือน้อยเกินไปสำหรับ Exchange'); return; }
+    const idx = state.selectedTileIdx;
+    if (idx === null) { alert('เลือกตัวอักษรที่จะแลกก่อน (คลิกที่ตัวอักษรใน Rack)'); return; }
+    const tile = state.youRack[idx];
+    global.RackManage.returnTiles(state.bag, [tile]);
+    const drawn = global.RackManage.drawTiles(state.bag, 1);
+    state.youRack.splice(idx, 1, drawn[0]);
+    state.selectedTileIdx = null;
+    logEntry('you', `แลกตัวอักษร 1 ตัว`);
+    state.passStreak++;
+    checkGameEndByPasses();
+    endTurn();
+  }
+
+  function checkGameEndByPasses() {
+    if (state.passStreak >= 6) {
+      state.gameOver = true;
+      logEntry('you', 'เกมจบ: Pass ติดต่อกันครบกำหนด');
+      stopTimer();
+    }
+  }
+
+  // ---------- challenge ----------
+
+  function challengeLastMove() {
+    if (!state.lastMove || state.gameOver) return;
+    const move = state.lastMove;
+    const invalid = move.formed.filter(w => !global.BotSystem.isValidWord(w.text));
+    const challenger = state.turn === 'bot' ? 'you' : 'bot'; // whoever's turn it currently is challenges the previous mover
+    const failed = invalid.length === 0; // move was actually valid -> challenge fails
+
+    if (failed) {
+      if (state.challengeRule === 'plus5') {
+        applyChallengePenalty(challenger, 5);
+        logEntry(challenger, `Challenge ล้มเหลว (คำถูกต้องทั้งหมด) เสีย 5 แต้ม`);
+      } else {
+        logEntry(challenger, `Challenge ล้มเหลว เสียเทิร์น`);
+        skipChallengerTurn(challenger);
+      }
+    } else {
+      // move gets retracted
+      retractLastMove(move);
+      logEntry(challenger, `Challenge สำเร็จ! คำ "${invalid.map(w => w.text).join(', ')}" ไม่ถูกต้อง ถอนคำคืน`);
+    }
+    state.lastMove = null;
+    renderAll();
+  }
+
+  function applyChallengePenalty(who, amount) {
+    if (who === 'you') state.youScore = Math.max(0, state.youScore - amount);
+    else state.botScore = Math.max(0, state.botScore - amount);
+  }
+
+  function skipChallengerTurn(challenger) {
+    // simplistic: mark a flag so their next natural turn is auto-passed once
+    state._skipNextTurnFor = challenger;
+  }
+
+  function retractLastMove(move) {
+    move.placements.forEach(p => { state.board[p.r][p.c] = null; });
+    if (move.by === 'you') state.youScore -= (move.score || 0);
+    else state.botScore -= (move.score || 0);
+  }
+
+  // ---------- turn flow ----------
+
+  function endTurn() {
+    renderAll();
+    if (state.gameOver) return;
+    state.turn = state.turn === 'you' ? 'bot' : 'you';
+    if (state._skipNextTurnFor === state.turn) {
+      state._skipNextTurnFor = null;
+      logEntry(state.turn, `${state.turn === 'you' ? 'คุณ' : 'บอท'} ถูกข้ามเทิร์นจาก Challenge`);
+      state.turn = state.turn === 'you' ? 'bot' : 'you';
+    }
+    if (state.turn === 'bot') doBotTurn();
+  }
+
+  function doBotTurn() {
+    global.BotSystem.decideMove(state.board, state.botRack, state.botLevel).then(move => {
+      if (state.gameOver) return;
+      if (!move) {
+        logEntry('bot', 'บอท Pass');
+        state.passStreak++;
+        checkGameEndByPasses();
+        state.turn = 'you';
+        renderAll();
+        return;
+      }
+      let scoreToApply = move.score;
+      if (state.scoringMode === 'manual') {
+        const selfCheck = global.BotSystem.botSelfScore(state.board, move.placements, move.direction);
+        scoreToApply = selfCheck.totalScore;
+      }
+      global.BoardSystems.applyPlacements(state.board, move.placements);
+      state.botScore += scoreToApply;
+      state.lastMove = { placements: move.placements, direction: move.direction, formed: move.formed, score: scoreToApply, by: 'bot' };
+      logEntry('bot', `บอทลงคำ: ${move.formed.map(w => w.text).join(', ')} +${scoreToApply}`);
+      refillRackAfterMove('bot', move.placements);
+      state.passStreak = 0;
+      state.turn = 'you';
+      renderAll();
+    });
+  }
+
+  function logEntry(by, text) {
+    state.moveLog.push({ by, text });
+    renderLog();
+  }
+
+  // ---------- timer ----------
+
+  function startTimer() {
+    if (state.timeMinutes === 0) { $('playTimer').textContent = '∞'; return; }
+    stopTimer();
+    timerInterval = setInterval(() => {
+      if (state.gameOver) { stopTimer(); return; }
+      if (state.turn === 'you') state.youSeconds = Math.max(0, state.youSeconds - 1);
+      else if (state.turn === 'bot') state.botSeconds = Math.max(0, state.botSeconds - 1);
+      updateTimerDisplay();
+      if ((state.turn === 'you' && state.youSeconds === 0) || (state.turn === 'bot' && state.botSeconds === 0)) {
+        state.gameOver = true;
+        logEntry(state.turn, 'หมดเวลา! เกมจบ');
+        stopTimer();
+      }
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
+  function updateTimerDisplay() {
+    const seconds = state.turn === 'you' ? state.youSeconds : state.botSeconds;
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    $('playTimer').textContent = `${m}:${s}`;
+  }
+
+  global.PlayGame = { init };
+})(window);
