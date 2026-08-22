@@ -35,7 +35,7 @@
   const I18N = {
     th: {
       'tab.dashboard': '📊 Dashboard', 'tab.generate': '📝 สร้างคำศัพท์', 'tab.quiz': '🎯 แบบทดสอบ',
-      'tab.cardbox': '🗂️ Cardbox', 'tab.browse': '📖 คลังคำศัพท์', 'tab.minigame': '🕹️ Minigame',
+      'tab.cardbox': '🗂️ Cardbox', 'tab.browse': '📖 คลังคำศัพท์', 'tab.builder': '🧩 Word Builder', 'tab.minigame': '🕹️ Minigame',
       'tab.achievements': '🏆 Achievement', 'tab.settings': '⚙️ Setting',
       'ach.title': '🏆 Achievement', 'ach.sub': 'ปลดล็อกเหรียญตราจากการเรียนและเล่นมินิเกม ข้อมูลเก็บไว้ในเบราว์เซอร์นี้เท่านั้น',
       'app.title': 'CSW24 Word Lab',
@@ -52,11 +52,17 @@
       'cardbox.searchLabel': '🔍 ค้นหาคำใน Cardbox', 'cardbox.sortLabel': 'เรียงลำดับ',
       'cardbox.sortRecent': 'เพิ่มล่าสุดก่อน', 'cardbox.sortRoundsDesc': 'จำนวนรอบเรียน: มาก→น้อย',
       'cardbox.sortRoundsAsc': 'จำนวนรอบเรียน: น้อย→มาก', 'cardbox.sortAlpha': 'ตัวอักษร (A→Z)',
+      'cardbox.sortProbDesc': 'Probability: มากไปน้อย', 'cardbox.sortProbAsc': 'Probability: น้อยไปมาก',
+      'cardbox.sortPlayDesc': 'Playability: มากไปน้อย', 'cardbox.sortPlayAsc': 'Playability: น้อยไปมาก',
       'cardbox.anagramReviewStart': '📖 Anagram Review', 'cardbox.anagramReviewSelected': '📖 Anagram Review คำที่เลือก',
       'cardbox.reviewSecondsLabel': 'วินาที', 'cardbox.reviewExit': '↩ ออกจาก Review',
       'cardbox.reviewStartStudy': '▶ เริ่มเรียนคำชุดนี้',
       'browse.title': 'คลังคำศัพท์ทั้งหมด', 'browse.search': '🔍 ค้นหา (Enter)', 'browse.clear': 'ล้างตัวกรอง', 'browse.sortLabel': 'เรียงลำดับ',
       'browse.wordSearchLabel': '🔍 ค้นหาคำศัพท์', 'browse.selectedCount': 'เลือกแล้ว 0 คำ', 'browse.saveSelected': '💾 บันทึกที่เลือกลง Cardbox',
+      'builder.title': '🧩 Word Builder',
+      'builder.sub': 'พิมพ์ชุดตัวอักษร (Rack) เช่น TISANE? หรือ SATIRE? — ระบบจะแสดงคำศัพท์ทุกคำที่ประกอบขึ้นได้จากตัวอักษรเหล่านั้น',
+      'builder.rackLabel': 'ตัวอักษร (Rack)', 'builder.build': '🧩 หาคำศัพท์',
+      'builder.sortLenDesc': 'ความยาว: มากไปน้อย', 'builder.sortLenAsc': 'ความยาว: น้อยไปมาก',
       'mini.title': '🕹️ Minigame', 'mini.typing': '⌨️ พิมพ์ศัพท์ Random', 'mini.racks': '🁢 Random Racks',
       'mini.alpha': '🔀 Alphagram Blitz', 'mini.marathon': '⚡ Time Attack Marathon',
       'mini.startGame': '▶ เริ่มเกม', 'mini.newRack': '▶ สุ่ม Rack ใหม่',
@@ -83,7 +89,7 @@
     },
     en: {
       'tab.dashboard': '📊 Dashboard', 'tab.generate': '📝 Generate', 'tab.quiz': '🎯 Quiz',
-      'tab.cardbox': '🗂️ Cardbox', 'tab.browse': '📖 Word Browser', 'tab.minigame': '🕹️ Minigame',
+      'tab.cardbox': '🗂️ Cardbox', 'tab.browse': '📖 Word Browser', 'tab.builder': '🧩 Word Builder', 'tab.minigame': '🕹️ Minigame',
       'tab.achievements': '🏆 Achievements', 'tab.settings': '⚙️ Settings',
       'ach.title': '🏆 Achievements', 'ach.sub': 'Unlock badges by studying and playing minigames. All data is stored in this browser only.',
       'app.title': 'CSW24 Word Lab',
@@ -100,11 +106,17 @@
       'cardbox.searchLabel': '🔍 Search in Cardbox', 'cardbox.sortLabel': 'Sort by',
       'cardbox.sortRecent': 'Recently added', 'cardbox.sortRoundsDesc': 'Study rounds: high→low',
       'cardbox.sortRoundsAsc': 'Study rounds: low→high', 'cardbox.sortAlpha': 'Alphabetical (A→Z)',
+      'cardbox.sortProbDesc': 'Probability: high→low', 'cardbox.sortProbAsc': 'Probability: low→high',
+      'cardbox.sortPlayDesc': 'Playability: high→low', 'cardbox.sortPlayAsc': 'Playability: low→high',
       'cardbox.anagramReviewStart': '📖 Anagram Review', 'cardbox.anagramReviewSelected': '📖 Anagram Review selected',
       'cardbox.reviewSecondsLabel': 'seconds', 'cardbox.reviewExit': '↩ Exit Review',
       'cardbox.reviewStartStudy': '▶ Start studying this set',
       'browse.title': 'Full word dictionary', 'browse.search': '🔍 Search (Enter)', 'browse.clear': 'Clear filters', 'browse.sortLabel': 'Sort by',
       'browse.wordSearchLabel': '🔍 Search for a word', 'browse.selectedCount': '0 selected', 'browse.saveSelected': '💾 Save selected to Cardbox',
+      'builder.title': '🧩 Word Builder',
+      'builder.sub': 'Type a rack of letters like TISANE? or SATIRE? — every dictionary word buildable from those letters will be listed.',
+      'builder.rackLabel': 'Letters (Rack)', 'builder.build': '🧩 Find words',
+      'builder.sortLenDesc': 'Length: high→low', 'builder.sortLenAsc': 'Length: low→high',
       'mini.title': '🕹️ Minigame', 'mini.typing': '⌨️ Random Word Typing', 'mini.racks': '🁢 Random Racks',
       'mini.alpha': '🔀 Alphagram Blitz', 'mini.marathon': '⚡ Time Attack Marathon',
       'mini.startGame': '▶ Start game', 'mini.newRack': '▶ New rack',
@@ -913,13 +925,17 @@
   function initTabs() {
     const btns = document.querySelectorAll('.tab-btn');
     const defaultBtn = document.querySelector('.tab-btn[data-tab="dashboard"]');
-    if (defaultBtn) defaultBtn.classList.add('active');
+    if (defaultBtn) {
+      defaultBtn.classList.add('active');
+      updateCurrentTabLabel(defaultBtn);
+    }
     btns.forEach(function (btn) {
       btn.addEventListener('click', function () {
         btns.forEach(function (b) { b.classList.remove('active'); });
         document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
         btn.classList.add('active');
         document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        updateCurrentTabLabel(btn);
         if (btn.dataset.tab === 'cardbox') renderCardboxTab();
         if (btn.dataset.tab === 'dashboard') renderDashboard();
         if (btn.dataset.tab === 'settings') { renderDashboard(); }
@@ -932,6 +948,11 @@
         if (btn.classList.contains('burger-tab-btn')) closeBurgerMenu();
       });
     });
+  }
+
+  function updateCurrentTabLabel(btn) {
+    const label = document.getElementById('currentTabLabel');
+    if (label) label.textContent = btn.textContent.trim();
   }
 
   // ---------- burger (hamburger) menu ----------
@@ -1252,6 +1273,10 @@
     if (sort === 'rounds-desc') return function (a, b) { return (b.correct + b.incorrect) - (a.correct + a.incorrect); };
     if (sort === 'rounds-asc') return function (a, b) { return (a.correct + a.incorrect) - (b.correct + b.incorrect); };
     if (sort === 'alpha') return function (a, b) { return a.word < b.word ? -1 : (a.word > b.word ? 1 : 0); };
+    if (sort === 'prob-desc') return function (a, b) { return wordProbabilityNormalizedPct(b.word) - wordProbabilityNormalizedPct(a.word); };
+    if (sort === 'prob-asc') return function (a, b) { return wordProbabilityNormalizedPct(a.word) - wordProbabilityNormalizedPct(b.word); };
+    if (sort === 'play-desc') return function (a, b) { return wordPlayability(b.word) - wordPlayability(a.word); };
+    if (sort === 'play-asc') return function (a, b) { return wordPlayability(a.word) - wordPlayability(b.word); };
     return function (a, b) { return b.addedAt - a.addedAt; };
   }
 
@@ -3037,6 +3062,111 @@
     }
   }
 
+  // ---------- Word Builder tab ----------
+  // Given a rack string like "TISANE?" (with optional '?' as blanks), find
+  // every dictionary word (any length from builderMinLen up to rack length)
+  // that can be built using each rack letter at most as many times as it
+  // appears, with blanks covering any shortfall.
+
+  const builderState = { results: [], selected: new Set() };
+
+  function builderRunSearch() {
+    const rawInput = document.getElementById('builderRackInput').value.trim().toUpperCase();
+    const rackLetters = rawInput.replace(/[^A-Z?]/g, '');
+    let minLen = parseInt(document.getElementById('builderMinLen').value, 10) || 2;
+    minLen = Math.max(CSW24_MIN_LEN, Math.min(minLen, CSW24_MAX_LEN));
+
+    const panel = document.getElementById('builderResultsPanel');
+    const countLabel = document.getElementById('builderResultCount');
+
+    if (!rackLetters) {
+      panel.style.display = 'none';
+      countLabel.textContent = '';
+      return;
+    }
+
+    const blankCount = (rackLetters.match(/\?/g) || []).length;
+    const rackCounts = letterCounts(rackLetters.replace(/\?/g, ''));
+    const rackSize = rackLetters.length;
+    const maxLen = Math.min(rackSize, CSW24_MAX_LEN);
+
+    const results = [];
+    for (let L = minLen; L <= maxLen; L++) {
+      const pool = lengthPool(L);
+      for (let i = 0; i < pool.length; i++) {
+        if (isSubsetOfCountsWithBlanks(pool[i], rackCounts, blankCount)) results.push(pool[i]);
+      }
+    }
+
+    builderState.results = results;
+    builderState.selected = new Set();
+    builderApplySort();
+    panel.style.display = '';
+    countLabel.textContent = 'พบ ' + results.length + ' คำ ที่ประกอบได้จาก "' + rackLetters + '"' +
+      (blankCount ? ' (รวม Blank ' + blankCount + ' ตัว)' : '');
+  }
+
+  function builderApplySort() {
+    const sortVal = document.getElementById('builderSortSelect').value;
+    const list = builderState.results.slice();
+    if (sortVal === 'alpha') list.sort();
+    else if (sortVal === 'len-desc') list.sort(function (a, b) { return b.length - a.length || a.localeCompare(b); });
+    else if (sortVal === 'len-asc') list.sort(function (a, b) { return a.length - b.length || a.localeCompare(b); });
+    else if (sortVal === 'score-desc') list.sort(function (a, b) { return wordScore(b) - wordScore(a) || a.localeCompare(b); });
+    else if (sortVal === 'prob-desc') list.sort(function (a, b) { return wordProbabilityNormalizedPct(b) - wordProbabilityNormalizedPct(a) || a.localeCompare(b); });
+    else if (sortVal === 'prob-asc') list.sort(function (a, b) { return wordProbabilityNormalizedPct(a) - wordProbabilityNormalizedPct(b) || a.localeCompare(b); });
+    else if (sortVal === 'play-desc') list.sort(function (a, b) { return wordPlayability(b) - wordPlayability(a) || a.localeCompare(b); });
+    else if (sortVal === 'play-asc') list.sort(function (a, b) { return wordPlayability(a) - wordPlayability(b) || a.localeCompare(b); });
+    builderState.results = list;
+    builderRenderResults();
+  }
+
+  function builderRenderResults() {
+    const wrap = document.getElementById('builderResults');
+    wrap.innerHTML = builderState.results.map(function (word) {
+      return wordRowHTML(word, true, builderState.selected, 'builder-check');
+    }).join('');
+    bindAnagramToggles(wrap);
+    builderUpdateSelectedCount();
+  }
+
+  function builderUpdateSelectedCount() {
+    document.getElementById('builderSelectedCount').textContent = 'เลือกแล้ว ' + builderState.selected.size + ' คำ';
+    document.getElementById('builderSelectAll').checked =
+      builderState.results.length > 0 && builderState.selected.size === builderState.results.length;
+  }
+
+  function initWordBuilder() {
+    document.getElementById('builderSearchBtn').addEventListener('click', builderRunSearch);
+    document.getElementById('builderRackInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') builderRunSearch();
+    });
+    document.getElementById('builderSortSelect').addEventListener('change', builderApplySort);
+
+    document.getElementById('builderSelectAll').addEventListener('change', function (e) {
+      const checked = e.target.checked;
+      if (checked) builderState.results.forEach(function (w) { builderState.selected.add(w); });
+      else builderState.selected.clear();
+      document.querySelectorAll('#builderResults .builder-check').forEach(function (cb) { cb.checked = checked; });
+      builderUpdateSelectedCount();
+    });
+
+    document.getElementById('builderResults').addEventListener('change', function (e) {
+      if (!e.target.classList.contains('builder-check')) return;
+      const word = e.target.dataset.word;
+      if (e.target.checked) builderState.selected.add(word);
+      else builderState.selected.delete(word);
+      builderUpdateSelectedCount();
+    });
+
+    document.getElementById('builderSaveBtn').addEventListener('click', function () {
+      if (!builderState.selected.size) { showToast('กรุณาเลือกคำศัพท์อย่างน้อย 1 คำ'); return; }
+      const added = addWordsToCardbox(Array.from(builderState.selected));
+      showToast('บันทึกลง Cardbox แล้ว ' + added + ' คำ');
+      if (window.Achievements) window.Achievements.record('cardbox_add');
+    });
+  }
+
   // ---------- Minigame: Alphagram Blitz ----------
 
   const alpha = {
@@ -3569,6 +3699,7 @@
     initDueTimeControls();
     initImportExport();
     initCardboxImportExport();
+    initWordBuilder();
     initTypingGame();
     initTgTypedPanel();
     initRacksGame();
