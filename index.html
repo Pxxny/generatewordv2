@@ -622,6 +622,24 @@
       <button class="btn btn-primary" id="playStartBtn">▶️ เริ่มเกม</button>
     </div>
 
+    <div class="panel-card" id="playCoinFlipCard" style="display:none">
+      <h2>🎲 สุ่มว่าใครเริ่มก่อน</h2>
+      <p class="panel-sub">เปิดฝากระเบื้องเพื่อดูว่าใครได้ตัวอักษรใกล้ A มากที่สุด (ตามธรรมเนียม Scrabble)</p>
+      <div class="play-coinflip-result" id="playCoinFlipResult">
+        <div class="coinflip-side">
+          <span>คุณ</span>
+          <div class="coinflip-tile" id="coinflipYouTile">?</div>
+        </div>
+        <div class="coinflip-vs">VS</div>
+        <div class="coinflip-side">
+          <span id="coinflipBotName">Bot</span>
+          <div class="coinflip-tile" id="coinflipBotTile">?</div>
+        </div>
+      </div>
+      <p class="coinflip-outcome" id="coinflipOutcome"></p>
+      <button class="btn btn-primary" id="playCoinFlipContinueBtn" style="display:none">▶️ เริ่มเล่น</button>
+    </div>
+
     <div class="panel-card" id="playGameCard" style="display:none">
       <div class="play-topbar">
         <div class="play-scoreboard">
