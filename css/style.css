@@ -1047,7 +1047,56 @@ main {
 .play-bagcount {
   font-size: 0.9rem;
   color: var(--ink-soft, var(--cream));
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--brass);
+  text-decoration: underline;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn-link:hover { color: var(--teal); }
+
+.play-bag-detail {
+  margin: 0.5rem 0 0.8rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--board-1);
+  border: 1px solid var(--rail);
+  border-radius: 8px;
+}
+.play-bag-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft, var(--cream));
+}
+.play-bag-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+  gap: 4px;
+}
+.play-bag-detail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 2px;
+  border-radius: 4px;
+  background: var(--tile);
+  color: var(--ink);
+  font-family: var(--font-mono);
+}
+.play-bag-detail-item .bd-letter { font-weight: 700; font-size: 0.85rem; }
+.play-bag-detail-item .bd-count { font-size: 0.7rem; opacity: 0.75; }
+.play-bag-detail-item.bd-empty { opacity: 0.3; }
 
 .play-board-wrap {
   display: flex;
@@ -1127,6 +1176,7 @@ main {
 .play-tile[draggable="true"] { cursor: grab; }
 .play-tile.tile-dragging { opacity: 0.4; }
 .play-cell.drag-over { outline: 2px dashed var(--teal); outline-offset: -2px; }
+.play-tile.drag-over { outline: 2px dashed var(--teal); outline-offset: 2px; }
 .play-tile-ghost {
   position: fixed;
   z-index: 9999;
