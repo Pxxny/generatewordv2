@@ -11,6 +11,9 @@
 <body>
 
 <header class="app-header">
+  <button class="burger-btn" id="burgerBtn" aria-label="เมนู" aria-expanded="false" aria-controls="burgerMenu">
+    <span></span><span></span><span></span>
+  </button>
   <div class="logo-tiles">
     <span class="logo-tile">C</span>
     <span class="logo-tile">S</span>
@@ -22,10 +25,18 @@
   <p data-i18n="app.subtitle">เจนคำศัพท์ · หา Anagram · เก็บลง Cardbox · ทบทวนแบบ Spaced Repetition · Minigame</p>
 </header>
 
+<div class="burger-overlay" id="burgerOverlay"></div>
+<nav class="burger-menu" id="burgerMenu" aria-hidden="true">
+  <div class="burger-menu-head">
+    <span class="burger-menu-title">เมนู</span>
+    <button class="burger-close-btn" id="burgerCloseBtn" aria-label="ปิดเมนู">✕</button>
+  </div>
+  <button class="tab-btn burger-tab-btn" data-tab="generate" data-i18n="tab.generate">📝 สร้างคำศัพท์</button>
+  <button class="tab-btn burger-tab-btn" data-tab="quiz" data-i18n="tab.quiz">🎯 แบบทดสอบ</button>
+</nav>
+
 <nav class="tab-nav">
   <button class="tab-btn" data-tab="dashboard" data-i18n="tab.dashboard">📊 Dashboard</button>
-  <button class="tab-btn" data-tab="generate" data-i18n="tab.generate">📝 สร้างคำศัพท์</button>
-  <button class="tab-btn" data-tab="quiz" data-i18n="tab.quiz">🎯 แบบทดสอบ</button>
   <button class="tab-btn" data-tab="cardbox" data-i18n="tab.cardbox">🗂️ Cardbox</button>
   <button class="tab-btn" data-tab="browse" data-i18n="tab.browse">📖 คลังคำศัพท์</button>
   <button class="tab-btn" data-tab="minigame" data-i18n="tab.minigame">🕹️ Minigame</button>
