@@ -956,6 +956,34 @@ main {
   border-radius: 8px;
   background: var(--board-1);
 }
+.play-mini-timer {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ink-soft, var(--cream));
+  opacity: 0.75;
+}
+.play-score-you.turn-active .play-mini-timer,
+.play-score-bot.turn-active .play-mini-timer {
+  color: var(--teal);
+  opacity: 1;
+  font-weight: 700;
+}
+.play-score-you.turn-active,
+.play-score-bot.turn-active {
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+.play-turn-indicator {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--brass);
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--rail);
+  border-radius: 999px;
+  background: var(--board-1);
+  white-space: nowrap;
+}
 .play-bagcount {
   font-size: 0.9rem;
   color: var(--ink-soft, var(--cream));
@@ -1036,6 +1064,9 @@ main {
 .play-tile.tile-used { opacity: 0.25; cursor: default; }
 .play-tile .tile-val { position: absolute; bottom: 1px; right: 3px; font-size: 0.55rem; opacity: 0.7; }
 .play-tile.tile-selected { outline: 2px solid var(--brass); }
+.play-tile[draggable="true"] { cursor: grab; }
+.play-tile.tile-dragging { opacity: 0.4; }
+.play-cell.drag-over { outline: 2px dashed var(--teal); outline-offset: -2px; }
 
 .play-manual-score {
   display: flex;
