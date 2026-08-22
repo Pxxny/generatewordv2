@@ -923,6 +923,52 @@ main {
   color: var(--cream);
 }
 
+.play-coinflip-result {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.4rem;
+  margin: 1.2rem 0;
+}
+.coinflip-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+.coinflip-vs {
+  font-family: var(--font-mono);
+  opacity: 0.6;
+  font-size: 0.9rem;
+}
+.coinflip-tile {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--board-2);
+  border: 1px solid var(--rail);
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--brass);
+  transition: transform 0.15s ease;
+}
+.coinflip-tile.flipping { animation: coinflip-spin 0.15s linear infinite; }
+.coinflip-tile.winner { outline: 3px solid var(--teal); background: var(--board-1); }
+@keyframes coinflip-spin {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(180deg); }
+}
+.coinflip-outcome {
+  text-align: center;
+  font-weight: 700;
+  min-height: 1.4em;
+}
+
 .play-topbar {
   display: flex;
   justify-content: space-between;
@@ -1067,6 +1113,14 @@ main {
 .play-tile[draggable="true"] { cursor: grab; }
 .play-tile.tile-dragging { opacity: 0.4; }
 .play-cell.drag-over { outline: 2px dashed var(--teal); outline-offset: -2px; }
+.play-tile-ghost {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(1.1);
+  opacity: 0.9;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
 
 .play-manual-score {
   display: flex;
