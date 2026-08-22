@@ -615,6 +615,7 @@
           <select id="playChallengeRule">
             <option value="double">Double (ท้าพลาดเสียเทิร์น)</option>
             <option value="plus5">+5 (ท้าพลาดเสีย 5 แต้ม)</option>
+            <option value="void">Void Challenge (ห้ามลงคำที่ไม่มีในดิก)</option>
           </select>
         </label>
       </div>
@@ -624,9 +625,15 @@
     <div class="panel-card" id="playGameCard" style="display:none">
       <div class="play-topbar">
         <div class="play-scoreboard">
-          <div class="play-score-you"><span>คุณ</span><strong id="playScoreYou">0</strong></div>
-          <div class="play-timer" id="playTimer">--:--</div>
-          <div class="play-score-bot"><span id="playBotLabel">Bot</span><strong id="playScoreBot">0</strong></div>
+          <div class="play-score-you" id="playScoreYouWrap">
+            <span>คุณ</span><strong id="playScoreYou">0</strong>
+            <span class="play-mini-timer" id="playTimerYou">--:--</span>
+          </div>
+          <div class="play-turn-indicator" id="playTurnIndicator">ตา: คุณ</div>
+          <div class="play-score-bot" id="playScoreBotWrap">
+            <span id="playBotLabel">Bot</span><strong id="playScoreBot">0</strong>
+            <span class="play-mini-timer" id="playTimerBot">--:--</span>
+          </div>
         </div>
         <div class="play-bagcount">🎒 Tile Bag: <span id="playBagCount">100</span></div>
       </div>
