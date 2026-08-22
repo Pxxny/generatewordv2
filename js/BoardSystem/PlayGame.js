@@ -60,6 +60,8 @@
     $('playHoldScoreBtn').addEventListener('click', holdManualScore);
     $('playCoinFlipContinueBtn').addEventListener('click', continueAfterCoinFlip);
     $('playBotLevel').addEventListener('change', updateBotThinkTimeNote);
+    $('playBagDetailBtn').addEventListener('click', toggleBagDetail);
+    $('playBagDetailCloseBtn').addEventListener('click', () => setBagDetailVisible(false));
     updateBotThinkTimeNote();
   }
 
@@ -239,13 +241,16 @@
 
       tileEl.addEventListener('click', () => onRackTileClick(idx));
 
-      // Drag-and-drop: rack tiles can be dragged straight onto the board.
-      // Two mechanisms so it works on both desktop (mouse) and mobile (touch):
+      // Drag-and-drop: rack tiles can be dragged onto the board to play them,
+      // OR dropped onto another spot in the rack to freely reorder the rack
+      // (drop position = insert-before-this-tile). Two mechanisms so it works
+      // on both desktop (mouse) and mobile (touch):
       //  - native HTML5 drag/drop for mouse
       //  - Pointer Events based custom drag for touch/pen (HTML5 DnD is not
       //    supported on most touch browsers, which is why dragging felt "stuck").
       const draggable = state.turn === 'you' && !usedInPending && !state.gameOver;
       tileEl.draggable = draggable;
+      tileEl.dataset.rackIdx = idx;
       if (draggable) {
         tileEl.addEventListener('dragstart', (e) => {
           e.dataTransfer.setData('text/plain', String(idx));
@@ -257,8 +262,62 @@
         tileEl.style.touchAction = 'none';
         tileEl.addEventListener('pointerdown', (e) => startPointerDrag(e, idx, tileEl));
       }
+
+      // Any rack tile (used or not, as long as it's your turn) can accept a
+      // drop to reorder — including tiles currently placed on the board this
+      // turn stay where they are; only the rack array's order changes.
+      if (state.turn === 'you' && !state.gameOver) {
+        tileEl.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          tileEl.classList.add('drag-over');
+        });
+        tileEl.addEventListener('dragleave', () => tileEl.classList.remove('drag-over'));
+        tileEl.addEventListener('drop', (e) => {
+          e.preventDefault();
+          tileEl.classList.remove('drag-over');
+          const idxStr = e.dataTransfer.getData('text/plain');
+          if (idxStr === '') return;
+          reorderRackTile(parseInt(idxStr, 10), idx);
+        });
+      }
+
       rackEl.appendChild(tileEl);
     });
+  }
+
+  // Move the tile at `fromIdx` so it sits at `toIdx` in the rack, shifting the
+  // tiles in between. Any tile already placed on the board this turn keeps
+  // its board position — only rack ORDER changes, so we remap pending[].rackIdx
+  // to follow its letter/slot through the reorder.
+  function reorderRackTile(fromIdx, toIdx) {
+    if (state.turn !== 'you' || state.gameOver) return;
+    if (fromIdx === toIdx) return;
+    if (fromIdx < 0 || fromIdx >= state.youRack.length) return;
+    if (toIdx < 0 || toIdx >= state.youRack.length) return;
+
+    const rack = state.youRack.slice();
+    const [moved] = rack.splice(fromIdx, 1);
+    rack.splice(toIdx, 0, moved);
+
+    // Build old-index -> new-index map so pending placements still point at
+    // the same physical tile after the array shuffles around.
+    const order = state.youRack.map((_, i) => i);
+    const [movedOrder] = order.splice(fromIdx, 1);
+    order.splice(toIdx, 0, movedOrder);
+    const remap = {};
+    order.forEach((oldIdx, newIdx) => { remap[oldIdx] = newIdx; });
+
+    state.youRack = rack;
+    state.pending.forEach(p => {
+      if (p.rackIdx !== undefined && remap[p.rackIdx] !== undefined) {
+        p.rackIdx = remap[p.rackIdx];
+      }
+    });
+    if (state.selectedTileIdx !== null && remap[state.selectedTileIdx] !== undefined) {
+      state.selectedTileIdx = remap[state.selectedTileIdx];
+    }
+    renderRack();
   }
 
   function renderScoreboard() {
@@ -286,6 +345,43 @@
 
   function renderBagCount() {
     $('playBagCount').textContent = global.RackManage.bagCount(state.bag);
+    renderBagDetail();
+  }
+
+  // ---------- bag detail (letters remaining) ----------
+
+  function toggleBagDetail() {
+    const panel = $('playBagDetailPanel');
+    const visible = panel.style.display !== 'none';
+    setBagDetailVisible(!visible);
+  }
+
+  function setBagDetailVisible(show) {
+    $('playBagDetailPanel').style.display = show ? '' : 'none';
+    if (show) renderBagDetail();
+  }
+
+  // Shows exactly what's left in state.bag right now — the bag is the only
+  // part of the tile supply that isn't visible elsewhere (your own rack is
+  // already shown, and the opponent's rack is intentionally hidden), so this
+  // reads directly off state.bag rather than the full tournament distribution.
+  function renderBagDetail() {
+    const panel = $('playBagDetailPanel');
+    if (!panel || panel.style.display === 'none') return;
+    const grid = $('playBagDetailGrid');
+    const counts = {};
+    (state.bag || []).forEach(letter => { counts[letter] = (counts[letter] || 0) + 1; });
+
+    const order = Object.keys(global.RackManage.TILE_DISTRIBUTION);
+    grid.innerHTML = order.map(letter => {
+      const count = counts[letter] || 0;
+      const display = letter === '?' ? 'BLANK' : letter;
+      const empty = count === 0 ? ' bd-empty' : '';
+      return `<div class="play-bag-detail-item${empty}">` +
+        `<span class="bd-letter">${display}</span>` +
+        `<span class="bd-count">${count}</span>` +
+        `</div>`;
+    }).join('');
   }
 
   function renderLog() {
@@ -331,6 +427,7 @@
       if (dragMoved && dragGhost) {
         positionDragGhost(ev.clientX, ev.clientY);
         highlightCellUnder(ev.clientX, ev.clientY);
+        highlightRackTileUnder(ev.clientX, ev.clientY);
       }
     }
 
@@ -340,10 +437,16 @@
       window.removeEventListener('pointercancel', onUp);
       tileEl.classList.remove('tile-dragging');
       clearCellHighlights();
+      clearRackTileHighlights();
       if (dragMoved) {
+        const rackTileIdx = rackTileIdxFromPoint(ev.clientX, ev.clientY);
         const cell = cellFromPoint(ev.clientX, ev.clientY);
         destroyDragGhost();
-        if (cell) placeRackTileAt(idx, cell.r, cell.c);
+        if (rackTileIdx !== null) {
+          reorderRackTile(idx, rackTileIdx);
+        } else if (cell) {
+          placeRackTileAt(idx, cell.r, cell.c);
+        }
       }
       dragMoved = false;
     }
@@ -393,6 +496,28 @@
 
   function clearCellHighlights() {
     document.querySelectorAll('.play-cell.drag-over').forEach(el => el.classList.remove('drag-over'));
+  }
+
+  function rackTileIdxFromPoint(x, y) {
+    if (dragGhost) dragGhost.style.display = 'none';
+    const el = document.elementFromPoint(x, y);
+    if (dragGhost) dragGhost.style.display = '';
+    const tileEl = el && el.closest ? el.closest('.play-tile') : null;
+    if (!tileEl || tileEl.dataset.rackIdx === undefined) return null;
+    return parseInt(tileEl.dataset.rackIdx, 10);
+  }
+
+  function highlightRackTileUnder(x, y) {
+    clearRackTileHighlights();
+    const idx = rackTileIdxFromPoint(x, y);
+    if (idx === null) return;
+    const rackEl = $('playRack');
+    const tileEl = rackEl.children[idx];
+    if (tileEl) tileEl.classList.add('drag-over');
+  }
+
+  function clearRackTileHighlights() {
+    document.querySelectorAll('.play-tile.drag-over').forEach(el => el.classList.remove('drag-over'));
   }
 
   function onCellClick(r, c) {

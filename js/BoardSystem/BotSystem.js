@@ -33,6 +33,11 @@
   // know, rather than obscure valid Scrabble words. Roughly approximates
   // word frequency without needing real frequency data: prefers words built
   // only from common letters and without unusual repeated-letter patterns.
+  // NOTE: kept intentionally loose (word length + rare-letter check only) —
+  // being too strict here was the single biggest cause of Basic Bot passing:
+  // it would fail to find ANY word for its rack and fall back to Pass. If this
+  // filter ever gets tightened again, make sure decideMove's fallback ladder
+  // below still has real words to widen into.
   const RARE_LETTERS = /[JQXZ]/;
   function isSimpleWord(word) {
     if (word.length < 2 || word.length > 7) return false;
@@ -92,6 +97,10 @@
   }
 
   // ---- Bot profiles ----
+  // searchDepth also drives maxExplore (searchDepth * EXPLORE_MULT) in
+  // generateCandidates — raised across the board so a real placement isn't
+  // missed just because the exploration budget ran out first (this used to
+  // be the main reason bots passed with legal moves still on the board).
   const PROFILES = {
     basic: {
       label: 'Basic Bot',
@@ -99,7 +108,7 @@
       maxWordLenPreference: 7,   // everyday words, 2-7 letters
       simpleWordsOnly: true,     // avoid obscure words / rare letters (J,Q,X,Z)
       bingoChance: 0.10,         // rarely finds/plays bingos
-      searchDepth: 40,
+      searchDepth: 120,
       rackManagementSkill: 0.2,  // poor at keeping good leaves
       mistakeChance: 0.25,       // sometimes skips a better word for a worse one
       thinkTimeMs: [4000, 10000],
@@ -111,7 +120,7 @@
       maxWordLenPreference: 9,
       simpleWordsOnly: false,    // uses specialty words, including J/Q/X/Z
       bingoChance: 0.55,         // actively hunts high-probability bingos
-      searchDepth: 90,
+      searchDepth: 180,
       rackManagementSkill: 0.55,
       mistakeChance: 0.10,
       thinkTimeMs: [2000, 11000],
@@ -123,7 +132,7 @@
       maxWordLenPreference: 10,
       simpleWordsOnly: false,    // same vocabulary range as Medium, but plays it better
       bingoChance: 0.7,
-      searchDepth: 140,
+      searchDepth: 250,
       rackManagementSkill: 0.8,
       mistakeChance: 0.04,
       thinkTimeMs: [5000, 9000],
@@ -159,14 +168,22 @@
   // whether the rack (plus letters already fixed on the board along that line) can
   // actually spell them. This replaces the old "shuffle rack and hope it happens to
   // spell a word left-to-right" approach, which is why the bot used to pass so often.
-  function generateCandidates(board, rack, profile, genStart, capMs) {
+  // opts.forceFullPool: ignore profile.simpleWordsOnly for this search (used by
+  // decideMove's fallback ladder so a bot never passes just because its
+  // "personality" vocabulary filter happened to have no match, when a legal
+  // move existed in the full dictionary).
+  // opts.candidateCap: override profile.searchDepth as the stop-early cap.
+  function generateCandidates(board, rack, profile, genStart, capMs, opts) {
+    opts = opts || {};
     ensureWordSet();
     const anchors = findAnchors(board);
     const candidates = [];
     const rackCounts = rackToCounts(rack);
     const maxLen = Math.min(7, profile.maxWordLenPreference);
+    const effectiveProfile = opts.forceFullPool ? Object.assign({}, profile, { simpleWordsOnly: false }) : profile;
+    const candidateCap = opts.candidateCap || profile.searchDepth;
     let explored = 0;
-    const maxExplore = profile.searchDepth * 20; // overall budget so it stays fast
+    const maxExplore = Math.max(profile.searchDepth, candidateCap) * 20; // overall budget so it stays fast
     const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
     // Leave headroom for the promised "thinking" delay: cap actual search work
     // at 80% of the profile's max think time so we never blow past it.
@@ -178,7 +195,7 @@
         const [dr, dc] = direction === 'H' ? [0, 1] : [1, 0];
         for (let wordLen = 2; wordLen <= maxLen; wordLen++) {
           if (deadline && (explored % 200 === 0) && now() > deadline) break outer;
-          const wordsOfLen = wordPoolForProfile(profile, wordLen);
+          const wordsOfLen = wordPoolForProfile(effectiveProfile, wordLen);
           if (!wordsOfLen || wordsOfLen.length === 0) continue;
           for (let startOffset = 0; startOffset < wordLen; startOffset++) {
             const startR = anchor.r - dr * startOffset;
@@ -243,7 +260,7 @@
 
               // Basic bot / medium bot: stop after finding a handful of options per slot
               // to keep them from being unrealistically exhaustive; Henry explores more.
-              if (candidates.length >= profile.searchDepth) break outer;
+              if (candidates.length >= candidateCap) break outer;
             }
           }
         }
@@ -293,7 +310,29 @@
 
     return new Promise(resolve => {
       const genStart = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-      const candidates = generateCandidates(board, rack, profile, genStart, cap);
+
+      // Fallback ladder: only pass when there is truly no legal placement
+      // anywhere in the full dictionary, not just within this bot's
+      // "personality" preferences (word length / simple-words filter /
+      // exploration budget). Each rung below widens the search rather than
+      // giving up, so Pass becomes a genuine last resort instead of a
+      // frequent outcome caused by a bot's own vocabulary restrictions.
+      let candidates = generateCandidates(board, rack, profile, genStart, cap);
+
+      if (candidates.length === 0 && profile.simpleWordsOnly) {
+        // Rung 1: same profile, but ignore the simple-word vocabulary filter.
+        candidates = generateCandidates(board, rack, profile, genStart, cap, { forceFullPool: true });
+      }
+
+      if (candidates.length === 0) {
+        // Rung 2: also relax the search-depth cap so a longer scan can run
+        // (still bounded by the think-time deadline inside generateCandidates).
+        candidates = generateCandidates(board, rack, profile, genStart, cap, {
+          forceFullPool: true,
+          candidateCap: Math.max(profile.searchDepth * 3, 300)
+        });
+      }
+
       const move = chooseMove(candidates, profile);
 
       if (opts.skipThinkDelay) {
