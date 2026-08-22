@@ -729,8 +729,12 @@
         '<div class="word-row-top">' +
           checkboxHTML +
           '<div>' + tileRowHTML(word) + '</div>' +
-          '<div class="word-meta">' + word.length + ' ตัวอักษร · ' + wordScore(word) + ' คะแนน · ' +
-            'Prob ' + wordProbabilityNormalizedPct(word) + '% · Play ' + wordPlayability(word) + '</div>' +
+          '<div class="word-meta">' +
+            '<span class="meta-item">' + word.length + ' ตัวอักษร</span>' +
+            '<span class="meta-item">' + wordScore(word) + ' คะแนน</span>' +
+            '<span class="meta-item">Prob ' + wordProbabilityNormalizedPct(word) + '%</span>' +
+            '<span class="meta-item">Play ' + wordPlayability(word) + '</span>' +
+          '</div>' +
           hookSummaryHTML(word) +
           '<button class="anagram-toggle" data-uid="' + uid + '" data-word="' + word + '">🔤 ดู Anagram</button>' +
         '</div>' +
@@ -925,7 +929,42 @@
           initBrowseChips();
           runBrowseSearch();
         }
+        if (btn.classList.contains('burger-tab-btn')) closeBurgerMenu();
       });
+    });
+  }
+
+  // ---------- burger (hamburger) menu ----------
+
+  function openBurgerMenu() {
+    document.getElementById('burgerMenu').classList.add('open');
+    document.getElementById('burgerOverlay').classList.add('open');
+    document.getElementById('burgerBtn').classList.add('open');
+    document.getElementById('burgerMenu').setAttribute('aria-hidden', 'false');
+    document.getElementById('burgerBtn').setAttribute('aria-expanded', 'true');
+  }
+
+  function closeBurgerMenu() {
+    document.getElementById('burgerMenu').classList.remove('open');
+    document.getElementById('burgerOverlay').classList.remove('open');
+    document.getElementById('burgerBtn').classList.remove('open');
+    document.getElementById('burgerMenu').setAttribute('aria-hidden', 'true');
+    document.getElementById('burgerBtn').setAttribute('aria-expanded', 'false');
+  }
+
+  function initBurgerMenu() {
+    const burgerBtn = document.getElementById('burgerBtn');
+    const overlay = document.getElementById('burgerOverlay');
+    const closeBtn = document.getElementById('burgerCloseBtn');
+    if (!burgerBtn) return;
+    burgerBtn.addEventListener('click', function () {
+      if (document.getElementById('burgerMenu').classList.contains('open')) closeBurgerMenu();
+      else openBurgerMenu();
+    });
+    overlay.addEventListener('click', closeBurgerMenu);
+    closeBtn.addEventListener('click', closeBurgerMenu);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeBurgerMenu();
     });
   }
 
@@ -3519,6 +3558,7 @@
     applyFontSettings();
     loadCustomWords();
     initTabs();
+    initBurgerMenu();
     applyI18n();
     initSettingsTab();
     initGenerator();
