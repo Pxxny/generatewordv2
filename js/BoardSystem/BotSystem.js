@@ -7,16 +7,25 @@
   const WORDSET = () => global.CSW24_WORDSET; // built lazily, Set per length for O(1) validity checks
 
   function ensureWordSet() {
-    if (global.CSW24_WORDSET) return;
+    // Guard against being called before words-data.js has finished loading/parsing
+    // (e.g. race condition, cached stale script, or a prior JS error on the page).
+    // If CSW24_BY_LENGTH isn't ready yet, don't cache an empty/partial set.
+    if (global.CSW24_WORDSET && global.CSW24_WORDSET.size > 0) return;
     const byLen = global.CSW24_BY_LENGTH;
+    if (!byLen || typeof byLen !== 'object' || Object.keys(byLen).length === 0) {
+      console.error('[BotSystem] CSW24_BY_LENGTH is missing/empty — words-data.js did not load correctly.');
+      global.CSW24_WORDSET = new Set(); // temporary empty set; will retry next call
+      return;
+    }
     const set = new Set();
-    for (const len in byLen) byLen[len].forEach(w => set.add(w));
+    for (const len in byLen) byLen[len].forEach(w => set.add(w.toUpperCase()));
     global.CSW24_WORDSET = set;
   }
 
   function isValidWord(word) {
     ensureWordSet();
-    return global.CSW24_WORDSET.has(word.toUpperCase());
+    if (!word) return false;
+    return global.CSW24_WORDSET.has(String(word).trim().toUpperCase());
   }
 
   // Rack-letter-count helper: does `rackCounts` (map letter->count, '?' = blanks)

@@ -8,16 +8,28 @@
 
   function $(id) { return document.getElementById(id); }
 
+  // Sort the player's rack alphabetically, with blank tiles ('?') pushed to the end
+  // (standard Scrabble rack convention). Bot's rack is left unsorted since it's never
+  // shown to the player.
+  function sortRackAlpha(rack) {
+    return rack.slice().sort((a, b) => {
+      if (a === '?' && b === '?') return 0;
+      if (a === '?') return 1;
+      if (b === '?') return -1;
+      return a.localeCompare(b);
+    });
+  }
+
   function newGame(opts) {
     const board = global.BoardSystems.createEmptyBoard();
     const bag = global.RackManage.createBag();
-    const youRack = global.RackManage.drawTiles(bag, 7);
+    const youRack = sortRackAlpha(global.RackManage.drawTiles(bag, 7));
     const botRack = global.RackManage.drawTiles(bag, 7);
     return {
       board, bag,
       youRack, botRack,
       youScore: 0, botScore: 0,
-      turn: 'you',
+      turn: opts.firstTurn === 'bot' ? 'bot' : 'you',
       botLevel: opts.botLevel,
       scoringMode: opts.scoringMode, // 'auto' | 'manual'
       challengeRule: opts.challengeRule, // 'double' | 'plus5'
@@ -46,7 +58,10 @@
     $('playChallengeBtn').addEventListener('click', challengeLastMove);
     $('playRecallBtn').addEventListener('click', recallPending);
     $('playHoldScoreBtn').addEventListener('click', holdManualScore);
+    $('playCoinFlipContinueBtn').addEventListener('click', continueAfterCoinFlip);
   }
+
+  let pendingGameOpts = null;
 
   function startGameFromSetup() {
     const botLevel = $('playBotLevel').value;
@@ -54,16 +69,78 @@
     const scoringMode = $('playScoringMode').value;
     const challengeRule = $('playChallengeRule').value;
 
-    state = newGame({ botLevel, timeMinutes, scoringMode, challengeRule });
+    pendingGameOpts = { botLevel, timeMinutes, scoringMode, challengeRule };
 
     $('playSetupCard').style.display = 'none';
+    $('playCoinFlipCard').style.display = 'block';
+    $('coinflipBotName').textContent = global.BotSystem.getProfile(botLevel).label;
+    runCoinFlip();
+  }
+
+  // ---------- coin flip: randomly decide who goes first ----------
+  // House rule: each side draws one tile; closest to 'A' goes first, and a
+  // blank beats every letter (same convention used with a real tile bag).
+  function tileDrawRank(letter) {
+    if (letter === '?') return -1; // blank always wins
+    return letter.charCodeAt(0);
+  }
+
+  function runCoinFlip() {
+    const youTileEl = $('coinflipYouTile');
+    const botTileEl = $('coinflipBotTile');
+    const outcomeEl = $('coinflipOutcome');
+    const continueBtn = $('playCoinFlipContinueBtn');
+    continueBtn.style.display = 'none';
+    outcomeEl.textContent = 'กำลังจั่ว...';
+    youTileEl.classList.add('flipping');
+    botTileEl.classList.add('flipping');
+    youTileEl.classList.remove('winner');
+    botTileEl.classList.remove('winner');
+
+    // Draw from a fresh temporary bag (doesn't touch the real game's bag/tiles).
+    const tempBag = global.RackManage.createBag();
+    const [youLetter, botLetter] = global.RackManage.drawTiles(tempBag, 2);
+
+    setTimeout(() => {
+      youTileEl.classList.remove('flipping');
+      botTileEl.classList.remove('flipping');
+      youTileEl.textContent = youLetter === '?' ? '★' : youLetter;
+      botTileEl.textContent = botLetter === '?' ? '★' : botLetter;
+
+      const youRank = tileDrawRank(youLetter);
+      const botRank = tileDrawRank(botLetter);
+      let firstTurn;
+      if (youRank === botRank) {
+        // tie (rare, e.g. drew the same letter) -> redraw
+        outcomeEl.textContent = 'เสมอ! จั่วใหม่...';
+        setTimeout(runCoinFlip, 800);
+        return;
+      } else if (youRank < botRank) {
+        firstTurn = 'you';
+        youTileEl.classList.add('winner');
+        outcomeEl.textContent = `คุณจั่ว ${youLetter === '?' ? 'Blank' : youLetter} ใกล้ A กว่า — คุณเริ่มก่อน!`;
+      } else {
+        firstTurn = 'bot';
+        botTileEl.classList.add('winner');
+        outcomeEl.textContent = `${$('coinflipBotName').textContent} จั่ว ${botLetter === '?' ? 'Blank' : botLetter} ใกล้ A กว่า — บอทเริ่มก่อน!`;
+      }
+      pendingGameOpts.firstTurn = firstTurn;
+      continueBtn.style.display = '';
+    }, 700);
+  }
+
+  function continueAfterCoinFlip() {
+    state = newGame(pendingGameOpts);
+
+    $('playCoinFlipCard').style.display = 'none';
     $('playGameCard').style.display = 'block';
-    $('playBotLabel').textContent = global.BotSystem.getProfile(botLevel).label;
-    $('playManualScoreWrap').style.display = scoringMode === 'manual' ? 'flex' : 'none';
-    $('playChallengeBtn').style.display = challengeRule === 'void' ? 'none' : '';
+    $('playBotLabel').textContent = global.BotSystem.getProfile(pendingGameOpts.botLevel).label;
+    $('playManualScoreWrap').style.display = pendingGameOpts.scoringMode === 'manual' ? 'flex' : 'none';
+    $('playChallengeBtn').style.display = pendingGameOpts.challengeRule === 'void' ? 'none' : '';
 
     renderAll();
     startTimer();
+    if (state.turn === 'bot') doBotTurn();
   }
 
   // ---------- rendering ----------
@@ -109,6 +186,7 @@
         cellEl.dataset.r = r;
         cellEl.dataset.c = c;
         cellEl.addEventListener('click', () => onCellClick(r, c));
+        // Native HTML5 drag/drop (mouse-only); pointer-based drag below covers touch too.
         cellEl.addEventListener('dragover', (e) => {
           if (state.turn !== 'you' || state.gameOver) return;
           if (state.board[r][c]) return;
@@ -152,8 +230,11 @@
 
       tileEl.addEventListener('click', () => onRackTileClick(idx));
 
-      // Drag-and-drop: rack tiles can be dragged straight onto the board,
-      // not just clicked-then-clicked.
+      // Drag-and-drop: rack tiles can be dragged straight onto the board.
+      // Two mechanisms so it works on both desktop (mouse) and mobile (touch):
+      //  - native HTML5 drag/drop for mouse
+      //  - Pointer Events based custom drag for touch/pen (HTML5 DnD is not
+      //    supported on most touch browsers, which is why dragging felt "stuck").
       const draggable = state.turn === 'you' && !usedInPending && !state.gameOver;
       tileEl.draggable = draggable;
       if (draggable) {
@@ -163,6 +244,9 @@
           tileEl.classList.add('tile-dragging');
         });
         tileEl.addEventListener('dragend', () => tileEl.classList.remove('tile-dragging'));
+
+        tileEl.style.touchAction = 'none';
+        tileEl.addEventListener('pointerdown', (e) => startPointerDrag(e, idx, tileEl));
       }
       rackEl.appendChild(tileEl);
     });
@@ -212,6 +296,94 @@
     if (alreadyUsed) return;
     state.selectedTileIdx = (state.selectedTileIdx === idx) ? null : idx;
     renderRack();
+  }
+
+  // ---------- pointer-based drag (works for touch, mouse, pen) ----------
+  let dragGhost = null;
+  let dragMoved = false;
+  let dragStartXY = null;
+
+  function startPointerDrag(e, idx, tileEl) {
+    if (state.turn !== 'you' || state.gameOver) return;
+    // Let a plain tap still work as click-to-select; only hijack once the
+    // pointer actually moves past a small threshold (i.e. a real drag).
+    dragMoved = false;
+    dragStartXY = { x: e.clientX, y: e.clientY };
+    const pointerId = e.pointerId;
+
+    function onMove(ev) {
+      const dx = ev.clientX - dragStartXY.x;
+      const dy = ev.clientY - dragStartXY.y;
+      if (!dragMoved && Math.hypot(dx, dy) > 8) {
+        dragMoved = true;
+        createDragGhost(tileEl, ev.clientX, ev.clientY);
+        tileEl.classList.add('tile-dragging');
+      }
+      if (dragMoved && dragGhost) {
+        positionDragGhost(ev.clientX, ev.clientY);
+        highlightCellUnder(ev.clientX, ev.clientY);
+      }
+    }
+
+    function onUp(ev) {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      tileEl.classList.remove('tile-dragging');
+      clearCellHighlights();
+      if (dragMoved) {
+        const cell = cellFromPoint(ev.clientX, ev.clientY);
+        destroyDragGhost();
+        if (cell) placeRackTileAt(idx, cell.r, cell.c);
+      }
+      dragMoved = false;
+    }
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  }
+
+  function createDragGhost(tileEl, x, y) {
+    destroyDragGhost();
+    dragGhost = tileEl.cloneNode(true);
+    dragGhost.classList.add('play-tile-ghost');
+    document.body.appendChild(dragGhost);
+    positionDragGhost(x, y);
+  }
+
+  function positionDragGhost(x, y) {
+    if (!dragGhost) return;
+    dragGhost.style.left = x + 'px';
+    dragGhost.style.top = y + 'px';
+  }
+
+  function destroyDragGhost() {
+    if (dragGhost) { dragGhost.remove(); dragGhost = null; }
+  }
+
+  function cellFromPoint(x, y) {
+    if (dragGhost) dragGhost.style.display = 'none';
+    const el = document.elementFromPoint(x, y);
+    if (dragGhost) dragGhost.style.display = '';
+    const cellEl = el && el.closest ? el.closest('.play-cell') : null;
+    if (!cellEl) return null;
+    return { r: parseInt(cellEl.dataset.r, 10), c: parseInt(cellEl.dataset.c, 10) };
+  }
+
+  function highlightCellUnder(x, y) {
+    clearCellHighlights();
+    const cell = cellFromPoint(x, y);
+    if (!cell) return;
+    if (state.board[cell.r][cell.c]) return;
+    const boardEl = $('playBoard');
+    const idx = cell.r * global.BoardSystems.SIZE + cell.c;
+    const cellEl = boardEl.children[idx];
+    if (cellEl) cellEl.classList.add('drag-over');
+  }
+
+  function clearCellHighlights() {
+    document.querySelectorAll('.play-cell.drag-over').forEach(el => el.classList.remove('drag-over'));
   }
 
   function onCellClick(r, c) {
@@ -350,7 +522,8 @@
     const remaining = state[rackKey].filter((_, idx) => !usedIdx.has(idx));
     const needed = 7 - remaining.length;
     const drawn = global.RackManage.drawTiles(state.bag, needed);
-    state[rackKey] = remaining.concat(drawn);
+    const newRack = remaining.concat(drawn);
+    state[rackKey] = who === 'you' ? sortRackAlpha(newRack) : newRack;
   }
 
   // ---------- pass / exchange ----------
@@ -373,6 +546,7 @@
     global.RackManage.returnTiles(state.bag, [tile]);
     const drawn = global.RackManage.drawTiles(state.bag, 1);
     state.youRack.splice(idx, 1, drawn[0]);
+    state.youRack = sortRackAlpha(state.youRack);
     state.selectedTileIdx = null;
     logEntry('you', `แลกตัวอักษร 1 ตัว`);
     state.passStreak++;
@@ -438,14 +612,14 @@
   // ---------- turn flow ----------
 
   function endTurn() {
-    renderAll();
-    if (state.gameOver) return;
+    if (state.gameOver) { renderAll(); return; }
     state.turn = state.turn === 'you' ? 'bot' : 'you';
     if (state._skipNextTurnFor === state.turn) {
       state._skipNextTurnFor = null;
       logEntry(state.turn, `${state.turn === 'you' ? 'คุณ' : 'บอท'} ถูกข้ามเทิร์นจาก Challenge`);
       state.turn = state.turn === 'you' ? 'bot' : 'you';
     }
+    renderAll();
     if (state.turn === 'bot') doBotTurn();
   }
 
